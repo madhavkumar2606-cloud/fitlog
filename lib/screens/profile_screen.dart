@@ -15,7 +15,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  static const _activities = <double, String>{
+  static final _activities = <double, String>{
     1.2: 'Sedentary: desk job, little walking',
     1.375: 'Light: lifting 2-3 times a week',
     1.55: 'Moderate: lifting 3-5 times a week',
