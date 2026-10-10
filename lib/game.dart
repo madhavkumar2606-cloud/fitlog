@@ -211,6 +211,7 @@ class Game {
     if (ref == null) return (0, <String>[]);
     final sets = await _db.sessionSets(id);
     if (sets.isEmpty) return (0, <String>[]);
+
     final int workoutXp = XpRules.workoutBase + XpRules.perSet * math.min<int>(sets.length, XpRules.maxSetsCounted);
     await _db.awardXp(XpEvent(ref.date, 'workout', 'S$id', workoutXp, 'Finished a workout'));
 

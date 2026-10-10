@@ -160,6 +160,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : Text(_creating ? 'Create account' : 'Sign in'),
               ),
+              if (Config.googleSignIn) ...[
               const SizedBox(height: 12),
               Row(children: [
                 const Expanded(child: Divider()),
@@ -182,6 +183,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 label: const Text('Continue with Google'),
               ),
+              ],
               const SizedBox(height: 24),
               TextButton(
                 onPressed: _busy ? null : AppSession.instance.continueAsGuest,
@@ -271,8 +273,20 @@ class _UsernameScreenState extends State<UsernameScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final preview = _name.text.trim().isEmpty ? '?' : _name.text.trim();
-    return Scaffold(
+    return PopScope(
+      canPop: widget.editing,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) AppSession.instance.signOut();
+      },
+      child: Scaffold(
       appBar: AppBar(
+        leading: widget.editing
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'Back to sign in',
+                onPressed: AppSession.instance.signOut,
+              ),
         title: Text(widget.editing ? 'Edit public profile' : 'Create your profile'),
         actions: [
           if (!widget.editing)
@@ -344,6 +358,6 @@ class _UsernameScreenState extends State<UsernameScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 }

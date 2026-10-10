@@ -55,7 +55,15 @@ class FriendDetail {
 }
 
 String friendlyError(Object e) {
-  if (e is AuthException) return e.message;
+  if (e is AuthException) {
+    if (e.message.toLowerCase().contains('provider is not enabled')) {
+      return 'Google sign-in is not set up yet. Use email and password for now.';
+    }
+    if (e.message.toLowerCase().contains('invalid login credentials')) {
+      return 'Wrong email or password.';
+    }
+    return e.message;
+  }
   if (e is PostgrestException) {
     if (e.code == '23505') return 'That already exists. Try a different one.';
     return e.message;

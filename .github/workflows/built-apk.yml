@@ -33,8 +33,9 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GOOGLE_SIGNIN: ${{ vars.GOOGLE_SIGNIN }}
         run: |
-          python3 -c "import json, os; json.dump({'SUPABASE_URL': os.environ.get('SUPABASE_URL', ''), 'SUPABASE_KEY': os.environ.get('SUPABASE_KEY', '')}, open('env.json', 'w'))"
+          python3 -c "import json, os; json.dump({'SUPABASE_URL': os.environ.get('SUPABASE_URL', ''), 'SUPABASE_KEY': os.environ.get('SUPABASE_KEY', ''), 'GOOGLE_SIGNIN': os.environ.get('GOOGLE_SIGNIN') or 'false'}, open('env.json', 'w'))"
 
       # Optional: permanent signing key so updates install over the old version.
       - name: Set up signing key

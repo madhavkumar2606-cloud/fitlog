@@ -67,6 +67,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  /// Leaves first-time setup and returns to the sign-in screen.
+  Future<void> _leaveSetup() => AppSession.instance.signOut();
+
   List<double> get _rates => _goal == 'bulk' ? _bulkRates : _cutRates;
 
   Future<void> _save() async {
@@ -108,8 +111,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.firstRun ? 'Set up FitLog' : 'Profile and goals')),
+    return PopScope(
+      canPop: !widget.firstRun,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leaveSetup();
+      },
+      child: Scaffold(
+      appBar: AppBar(
+        leading: widget.firstRun
+            ? IconButton(icon: const Icon(Icons.arrow_back), tooltip: 'Back to sign in', onPressed: _leaveSetup)
+            : null,
+        title: Text(widget.firstRun ? 'Set up FitLog' : 'Profile and goals'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -217,6 +230,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           FilledButton(onPressed: _save, child: Text(widget.firstRun ? 'Start' : 'Save')),
         ],
       ),
-    );
+    ));
   }
 }
