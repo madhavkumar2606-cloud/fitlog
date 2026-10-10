@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# FitLog secrets (never commit these)
+env.json
+android/key.properties
+*.jks
+*.keystore

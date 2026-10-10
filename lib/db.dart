@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -5,7 +7,10 @@ import 'models.dart';
 import 'seed.dart';
 import 'util.dart';
 
-const _schema = [
+const _dbVersion = 2;
+const guestDbFile = 'fitlog.db';
+
+const _schemaV1 = [
   '''CREATE TABLE profile(id INTEGER PRIMARY KEY, sex TEXT NOT NULL, age INTEGER NOT NULL,
      height_cm REAL NOT NULL, weight_kg REAL NOT NULL, activity REAL NOT NULL,
      goal TEXT NOT NULL, rate REAL NOT NULL)''',
@@ -35,26 +40,110 @@ const _schema = [
   'CREATE INDEX idx_set_log_ex ON set_log(exercise_id)',
 ];
 
+/// Added in version 2: display name, XP events, badges and a small key-value store.
+const _schemaV2 = [
+  "ALTER TABLE profile ADD COLUMN name TEXT NOT NULL DEFAULT ''",
+  '''CREATE TABLE xp_event(id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
+     kind TEXT NOT NULL, ref TEXT NOT NULL, xp INTEGER NOT NULL, label TEXT NOT NULL,
+     UNIQUE(kind, ref))''',
+  'CREATE INDEX idx_xp_date ON xp_event(date)',
+  'CREATE TABLE badge(id TEXT PRIMARY KEY, earned_at TEXT NOT NULL)',
+  'CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+];
+
+class XpEvent {
+  final String date, kind, ref, label;
+  final int xp;
+  const XpEvent(this.date, this.kind, this.ref, this.xp, this.label);
+}
+
+class SessionSetRow {
+  final int exerciseId;
+  final String exerciseName;
+  final double weight;
+  final int reps;
+  const SessionSetRow(this.exerciseId, this.exerciseName, this.weight, this.reps);
+}
+
+class SessionRef {
+  final int id;
+  final String date, startedAt;
+  const SessionRef(this.id, this.date, this.startedAt);
+}
+
 class AppDb {
   AppDb._();
   static final AppDb instance = AppDb._();
 
   Future<Database>? _future;
-  Future<Database> get db => _future ??= _open();
+  String? _file;
 
-  Future<Database> _open() async {
+  String? get currentFile => _file;
+
+  Future<Database> get db {
+    final f = _future;
+    if (f == null) throw StateError('Database not opened yet');
+    return f;
+  }
+
+  /// Opens the data file for one person. Each account on the phone gets its own file.
+  /// With [claimGuest], the first account to sign in takes over any offline (guest) data.
+  Future<void> openFor(String fileName, {bool claimGuest = false}) async {
+    if (_file == fileName && _future != null) return;
+    await close();
     final dir = await getDatabasesPath();
-    return openDatabase(
-      p.join(dir, 'fitlog.db'),
-      version: 1,
+    final target = p.join(dir, fileName);
+    if (claimGuest && fileName != guestDbFile && !File(target).existsSync()) {
+      final guest = p.join(dir, guestDbFile);
+      if (File(guest).existsSync()) {
+        for (final suffix in ['', '-wal', '-shm', '-journal']) {
+          final f = File('$guest$suffix');
+          if (f.existsSync()) f.renameSync('$target$suffix');
+        }
+      }
+    }
+    _file = fileName;
+    _future = openDatabase(
+      target,
+      version: _dbVersion,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async {
-        for (final stmt in _schema) {
+        for (final stmt in [..._schemaV1, ..._schemaV2]) {
           await db.execute(stmt);
         }
         await seedDatabase(db);
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          for (final stmt in _schemaV2) {
+            await db.execute(stmt);
+          }
+        }
+      },
     );
+    await _future;
+  }
+
+  Future<void> close() async {
+    final f = _future;
+    _future = null;
+    _file = null;
+    if (f != null) {
+      try {
+        await (await f).close();
+      } catch (_) {}
+    }
+  }
+
+  // ---------- Meta ----------
+
+  Future<String?> getMeta(String key) async {
+    final rows = await (await db).query('meta', where: 'key = ?', whereArgs: [key]);
+    return rows.isEmpty ? null : rows.first['value'] as String;
+  }
+
+  Future<void> setMeta(String key, String value) async {
+    await (await db).insert('meta', {'key': key, 'value': value}, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // ---------- Profile & body weight ----------
@@ -79,6 +168,11 @@ class AppDb {
     final rows = await (await db)
         .query('weight_log', where: 'date >= ?', whereArgs: [daysAgoKey(days)], orderBy: 'date');
     return [for (final r in rows) DayValue(r['date'] as String, toD(r['kg']))];
+  }
+
+  Future<List<String>> weightDates() async {
+    final rows = await (await db).query('weight_log', columns: ['date'], orderBy: 'date');
+    return [for (final r in rows) r['date'] as String];
   }
 
   Future<DayValue?> latestWeight() async {
@@ -181,6 +275,24 @@ class AppDb {
     ];
   }
 
+  /// Number of food entries per day since [from].
+  Future<Map<String, int>> entryCountsSince(String from) async {
+    final rows = await (await db)
+        .rawQuery('SELECT date, COUNT(*) AS c FROM food_log WHERE date >= ? GROUP BY date', [from]);
+    return {for (final r in rows) r['date'] as String: r['c'] as int};
+  }
+
+  Future<Set<String>> mealsLogged(String date) async {
+    final rows = await (await db).rawQuery('SELECT DISTINCT meal FROM food_log WHERE date = ?', [date]);
+    return {for (final r in rows) r['meal'] as String};
+  }
+
+  Future<double> mealProtein(String date, String meal) async {
+    final rows = await (await db).rawQuery(
+        'SELECT COALESCE(SUM(protein),0) AS p FROM food_log WHERE date = ? AND meal = ?', [date, meal]);
+    return toD(rows.first['p']);
+  }
+
   // ---------- Exercises & routines ----------
 
   Future<List<Exercise>> exercises() async {
@@ -256,7 +368,8 @@ class AppDb {
 
   // ---------- Sessions ----------
 
-  Future<void> saveSession({
+  /// Saves a finished workout and returns its id.
+  Future<int> saveSession({
     required String date,
     int? routineId,
     required String routineName,
@@ -266,7 +379,7 @@ class AppDb {
     required List<LoggedExercise> exercises,
   }) async {
     final d = await db;
-    await d.transaction((txn) async {
+    return d.transaction<int>((txn) async {
       final sid = await txn.insert('session', {
         'date': date,
         'routine_id': routineId,
@@ -286,6 +399,7 @@ class AppDb {
           });
         }
       }
+      return sid;
     });
   }
 
@@ -320,6 +434,57 @@ class AppDb {
     ];
   }
 
+  Future<SessionSummary?> sessionSummary(int id) async {
+    final rows = await (await db).rawQuery('''
+      SELECT s.id, s.date, s.routine_name, s.duration_min, s.kcal_burned,
+             COUNT(l.id) AS sets, COALESCE(SUM(l.weight * l.reps), 0) AS volume
+      FROM session s LEFT JOIN set_log l ON l.session_id = s.id
+      WHERE s.id = ? GROUP BY s.id''', [id]);
+    if (rows.isEmpty) return null;
+    final r = rows.first;
+    return SessionSummary(
+      id: r['id'] as int,
+      date: r['date'] as String,
+      routineName: r['routine_name'] as String,
+      durationMin: r['duration_min'] as int,
+      sets: r['sets'] as int,
+      kcalBurned: toD(r['kcal_burned']),
+      volume: toD(r['volume']),
+    );
+  }
+
+  Future<List<SessionRef>> allSessionRefs() async {
+    final rows = await (await db).query('session', columns: ['id', 'date', 'started_at'], orderBy: 'started_at');
+    return [for (final r in rows) SessionRef(r['id'] as int, r['date'] as String, r['started_at'] as String)];
+  }
+
+  Future<SessionRef?> sessionRef(int id) async {
+    final rows =
+        await (await db).query('session', columns: ['id', 'date', 'started_at'], where: 'id = ?', whereArgs: [id]);
+    if (rows.isEmpty) return null;
+    final r = rows.first;
+    return SessionRef(r['id'] as int, r['date'] as String, r['started_at'] as String);
+  }
+
+  Future<List<SessionSetRow>> sessionSets(int sessionId) async {
+    final rows = await (await db).rawQuery('''
+      SELECT l.exercise_id, e.name AS ename, l.weight, l.reps FROM set_log l
+      JOIN exercise e ON e.id = l.exercise_id WHERE l.session_id = ? ORDER BY l.id''', [sessionId]);
+    return [
+      for (final r in rows)
+        SessionSetRow(r['exercise_id'] as int, r['ename'] as String, toD(r['weight']), r['reps'] as int)
+    ];
+  }
+
+  /// Best estimated 1RM for an exercise from sessions that started before [startedAt].
+  Future<double> bestE1rmBefore(int exerciseId, String startedAt) async {
+    final rows = await (await db).rawQuery('''
+      SELECT MAX(CASE WHEN l.reps <= 1 THEN l.weight ELSE l.weight * (1 + l.reps / 30.0) END) AS best
+      FROM set_log l JOIN session s ON s.id = l.session_id
+      WHERE l.exercise_id = ? AND s.started_at < ? AND l.reps > 0 AND l.weight > 0''', [exerciseId, startedAt]);
+    return toD(rows.first['best']);
+  }
+
   Future<List<Map<String, Object?>>> sessionDetail(int id) async {
     return (await db).rawQuery('''
       SELECT l.weight, l.reps, e.name AS ename FROM set_log l
@@ -327,7 +492,10 @@ class AppDb {
   }
 
   Future<void> deleteSession(int id) async {
-    await (await db).delete('session', where: 'id = ?', whereArgs: [id]);
+    final d = await db;
+    await d.delete('session', where: 'id = ?', whereArgs: [id]);
+    await d.delete('xp_event',
+        where: "kind IN ('workout', 'pr') AND (ref = ? OR ref LIKE ?)", whereArgs: ['S$id', 'S$id:%']);
   }
 
   Future<bool> trainedOn(String date) async {
@@ -338,6 +506,61 @@ class AppDb {
   Future<int> sessionCountSince(String from) async {
     final rows = await (await db).rawQuery('SELECT COUNT(*) AS c FROM session WHERE date >= ?', [from]);
     return Sqflite.firstIntValue(rows) ?? 0;
+  }
+
+  Future<int> sessionCountBetween(String from, String to) async {
+    final rows = await (await db)
+        .rawQuery('SELECT COUNT(*) AS c FROM session WHERE date >= ? AND date <= ?', [from, to]);
+    return Sqflite.firstIntValue(rows) ?? 0;
+  }
+
+  Future<double> volumeBetween(String from, String to) async {
+    final rows = await (await db).rawQuery('''
+      SELECT COALESCE(SUM(l.weight * l.reps), 0) AS v FROM set_log l
+      JOIN session s ON s.id = l.session_id WHERE s.date >= ? AND s.date <= ?''', [from, to]);
+    return toD(rows.first['v']);
+  }
+
+  Future<int> setsOn(String date) async {
+    final rows = await (await db).rawQuery('''
+      SELECT COUNT(*) AS c FROM set_log l JOIN session s ON s.id = l.session_id WHERE s.date = ?''', [date]);
+    return Sqflite.firstIntValue(rows) ?? 0;
+  }
+
+  Future<List<String>> sessionDatesSince(String from) async {
+    final rows =
+        await (await db).rawQuery('SELECT DISTINCT date FROM session WHERE date >= ? ORDER BY date', [from]);
+    return [for (final r in rows) r['date'] as String];
+  }
+
+  /// Lifetime totals: (workouts, sets, volume in kg).
+  Future<(int, int, double)> lifetimeTraining() async {
+    final d = await db;
+    final s = Sqflite.firstIntValue(await d.rawQuery('SELECT COUNT(*) FROM session')) ?? 0;
+    final r = await d.rawQuery('SELECT COUNT(*) AS c, COALESCE(SUM(weight * reps), 0) AS v FROM set_log');
+    return (s, r.first['c'] as int, toD(r.first['v']));
+  }
+
+  /// Completed sets per muscle group since [from].
+  Future<Map<String, int>> setsPerMuscle(String from) async {
+    final rows = await (await db).rawQuery('''
+      SELECT e.muscle AS muscle, COUNT(*) AS c FROM set_log l
+      JOIN session s ON s.id = l.session_id JOIN exercise e ON e.id = l.exercise_id
+      WHERE s.date >= ? GROUP BY e.muscle ORDER BY c DESC''', [from]);
+    return {for (final r in rows) r['muscle'] as String: r['c'] as int};
+  }
+
+  /// Total volume per week (keyed by Monday) since [from].
+  Future<Map<String, double>> weeklyVolume(String from) async {
+    final rows = await (await db).rawQuery('''
+      SELECT s.date AS date, SUM(l.weight * l.reps) AS v FROM set_log l
+      JOIN session s ON s.id = l.session_id WHERE s.date >= ? GROUP BY s.date''', [from]);
+    final out = <String, double>{};
+    for (final r in rows) {
+      final wk = weekStartKey(parseDay(r['date'] as String));
+      out[wk] = (out[wk] ?? 0) + toD(r['v']);
+    }
+    return out;
   }
 
   Future<List<Exercise>> exercisesWithHistory() async {
@@ -356,5 +579,68 @@ class AppDb {
       WHERE l.exercise_id = ? AND l.reps > 0
       GROUP BY s.id ORDER BY s.started_at''', [exerciseId]);
     return [for (final r in rows) DayValue(r['date'] as String, toD(r['e1rm']))];
+  }
+
+  /// Days with any activity (food, workout or weigh-in) since [from].
+  Future<Set<String>> activeDays(String from) async {
+    final rows = await (await db).rawQuery('''
+      SELECT date FROM food_log WHERE date >= ?
+      UNION SELECT date FROM session WHERE date >= ?
+      UNION SELECT date FROM weight_log WHERE date >= ?''', [from, from, from]);
+    return {for (final r in rows) r['date'] as String};
+  }
+
+  // ---------- XP & badges ----------
+
+  /// Returns true if the event was new (each kind+ref can only be awarded once).
+  Future<bool> awardXp(XpEvent e) async {
+    final id = await (await db).insert(
+      'xp_event',
+      {'date': e.date, 'kind': e.kind, 'ref': e.ref, 'xp': e.xp, 'label': e.label},
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+    return id > 0;
+  }
+
+  Future<int> totalXp() async {
+    final rows = await (await db).rawQuery('SELECT COALESCE(SUM(xp), 0) AS x FROM xp_event');
+    return (rows.first['x'] as num).toInt();
+  }
+
+  Future<int> xpBetween(String from, String to) async {
+    final rows = await (await db)
+        .rawQuery('SELECT COALESCE(SUM(xp), 0) AS x FROM xp_event WHERE date >= ? AND date <= ?', [from, to]);
+    return (rows.first['x'] as num).toInt();
+  }
+
+  Future<Map<String, int>> xpByDay(String from) async {
+    final rows = await (await db)
+        .rawQuery('SELECT date, SUM(xp) AS x FROM xp_event WHERE date >= ? GROUP BY date', [from]);
+    return {for (final r in rows) r['date'] as String: (r['x'] as num).toInt()};
+  }
+
+  Future<List<XpEvent>> xpEventsFor(String date) async {
+    final rows = await (await db).query('xp_event', where: 'date = ?', whereArgs: [date], orderBy: 'id');
+    return [
+      for (final r in rows)
+        XpEvent(r['date'] as String, r['kind'] as String, r['ref'] as String, r['xp'] as int, r['label'] as String)
+    ];
+  }
+
+  Future<int> countXp(String kind, {String? refSuffix}) async {
+    final rows = refSuffix == null
+        ? await (await db).rawQuery('SELECT COUNT(*) FROM xp_event WHERE kind = ?', [kind])
+        : await (await db)
+            .rawQuery('SELECT COUNT(*) FROM xp_event WHERE kind = ? AND ref LIKE ?', [kind, '%$refSuffix']);
+    return Sqflite.firstIntValue(rows) ?? 0;
+  }
+
+  Future<Map<String, String>> earnedBadges() async {
+    final rows = await (await db).query('badge');
+    return {for (final r in rows) r['id'] as String: r['earned_at'] as String};
+  }
+
+  Future<void> addBadge(String id, String date) async {
+    await (await db).insert('badge', {'id': id, 'earned_at': date}, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 }

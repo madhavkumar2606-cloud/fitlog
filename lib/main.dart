@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
-import 'db.dart';
+import 'screens/auth_screen.dart';
 import 'screens/food_screen.dart';
+import 'screens/friends_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/progress_screen.dart';
 import 'screens/today_screen.dart';
 import 'screens/workout_screen.dart';
+import 'session.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const FitLogApp());
+  AppSession.instance.start();
 }
 
 class FitLogApp extends StatelessWidget {
@@ -17,6 +20,7 @@ class FitLogApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Iron blue with a warm plate-orange accent.
     final scheme = ColorScheme.fromSeed(
       seedColor: const Color(0xFF3D5A80),
       brightness: Brightness.dark,
@@ -42,37 +46,49 @@ class FitLogApp extends StatelessWidget {
   }
 }
 
-class _Gate extends StatefulWidget {
+/// Decides what to show: loading, sign-in, username setup, body profile setup, or the app.
+class _Gate extends StatelessWidget {
   const _Gate();
 
   @override
-  State<_Gate> createState() => _GateState();
+  Widget build(BuildContext context) {
+    final session = AppSession.instance;
+    return ListenableBuilder(
+      listenable: session,
+      builder: (context, _) {
+        if (session.mode == AuthMode.loading) return const _Splash();
+        if (session.mode == AuthMode.signedOut) return const AuthScreen();
+        if (session.needsUsername) return const UsernameScreen();
+        if (!session.hasBodyProfile) {
+          return ProfileScreen(
+            key: ValueKey('setup-${session.userId}'),
+            firstRun: true,
+            onSaved: session.bodyProfileSaved,
+          );
+        }
+        return HomeShell(key: ValueKey(session.userId ?? 'guest'));
+      },
+    );
+  }
 }
 
-class _GateState extends State<_Gate> {
-  bool? _hasProfile;
-
-  @override
-  void initState() {
-    super.initState();
-    _check();
-  }
-
-  Future<void> _check() async {
-    final p = await AppDb.instance.getProfile();
-    if (!mounted) return;
-    setState(() => _hasProfile = p != null);
-  }
+class _Splash extends StatelessWidget {
+  const _Splash();
 
   @override
   Widget build(BuildContext context) {
-    if (_hasProfile == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (_hasProfile == false) {
-      return ProfileScreen(firstRun: true, onSaved: _check);
-    }
-    return const HomeShell();
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.fitness_center, size: 56, color: theme.colorScheme.primary),
+          const SizedBox(height: 12),
+          Text('FitLog', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 24),
+          const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 3)),
+        ]),
+      ),
+    );
   }
 }
 
@@ -95,6 +111,7 @@ class _HomeShellState extends State<HomeShell> {
       const WorkoutScreen(),
       const FoodScreen(),
       const ProgressScreen(),
+      const FriendsScreen(),
     ];
     return Scaffold(
       body: pages[_index],
@@ -103,10 +120,12 @@ class _HomeShellState extends State<HomeShell> {
         onDestinationSelected: _go,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.today_outlined), selectedIcon: Icon(Icons.today), label: 'Today'),
-          NavigationDestination(icon: Icon(Icons.fitness_center), label: 'Workouts'),
+          NavigationDestination(icon: Icon(Icons.fitness_center), label: 'Train'),
           NavigationDestination(
               icon: Icon(Icons.restaurant_outlined), selectedIcon: Icon(Icons.restaurant), label: 'Food'),
-          NavigationDestination(icon: Icon(Icons.show_chart), label: 'Progress'),
+          NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Progress'),
+          NavigationDestination(
+              icon: Icon(Icons.emoji_events_outlined), selectedIcon: Icon(Icons.emoji_events), label: 'Friends'),
         ],
       ),
     );

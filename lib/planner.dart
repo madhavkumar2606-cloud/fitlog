@@ -19,6 +19,12 @@ class PlanSnapshot {
     required this.planned,
     required this.sessionsPerWeek,
   });
+
+  bool get trainingDay => trained || planned;
+
+  /// Target for a rest day with the same settings (used to explain calorie cycling).
+  DailyTarget get restTarget =>
+      dailyTarget(profile, tdee.value, trainingDay: false, sessionsPerWeek: sessionsPerWeek);
 }
 
 Future<PlanSnapshot> loadPlan(String date) async {
@@ -39,35 +45,5 @@ Future<PlanSnapshot> loadPlan(String date) async {
     trained: trained,
     planned: planned,
     sessionsPerWeek: spw,
-  );
-}
-
-Future<List<Insight>> loadInsights(PlanSnapshot plan) async {
-  final db = AppDb.instance;
-  final today = todayKey();
-  final weekAgo = daysAgoKey(7);
-  final totals = await db.dailyTotals(days: 8);
-  final last7 = totals.where((d) => d.date.compareTo(weekAgo) >= 0 && d.date.compareTo(today) < 0).toList();
-  final sessions14 = await db.sessionCountSince(daysAgoKey(14));
-
-  final from42 = daysAgoKey(42);
-  final lifts = <LiftTrend>[];
-  for (final ex in await db.exercisesWithHistory()) {
-    final hist = (await db.e1rmHistory(ex.id)).where((e) => e.date.compareTo(from42) >= 0).toList();
-    if (hist.length < 4) continue;
-    final first = (hist[0].value + hist[1].value) / 2;
-    final last = (hist[hist.length - 1].value + hist[hist.length - 2].value) / 2;
-    if (first <= 0) continue;
-    lifts.add(LiftTrend(ex.name, (last - first) / first * 100));
-  }
-  lifts.sort((a, b) => a.changePct.compareTo(b.changePct));
-
-  return buildInsights(
-    target: plan.target,
-    tdee: plan.tdee.value,
-    goal: plan.profile.goal,
-    last7: last7,
-    sessions14: sessions14,
-    lifts: lifts,
   );
 }

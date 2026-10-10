@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../calc.dart';
 import '../db.dart';
+import '../game.dart';
 import '../models.dart';
+import '../social.dart';
 import '../util.dart';
 import '../widgets.dart';
 import 'workout_screen.dart';
@@ -58,6 +60,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   Duration _elapsed = Duration.zero;
   int _restLeft = 0;
   bool _ready = false;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -142,6 +145,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   }
 
   Future<void> _finish() async {
+    if (_saving) return;
     final logged = _collect();
     if (logged.isEmpty) {
       final discard = await confirmDialog(
@@ -149,10 +153,11 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       if (discard && mounted) Navigator.pop(context, false);
       return;
     }
+    setState(() => _saving = true);
     final profile = await AppDb.instance.getProfile();
     final minutes = math.max(1, _elapsed.inMinutes);
     final kcal = strengthKcal(profile?.weightKg ?? 70, minutes);
-    await AppDb.instance.saveSession(
+    final sid = await AppDb.instance.saveSession(
       date: dayKey(_startedAt),
       routineId: widget.routine.id,
       routineName: widget.routine.name,
@@ -161,10 +166,15 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       kcalBurned: kcal,
       exercises: logged,
     );
-    if (!mounted) return;
-    final sets = logged.fold<int>(0, (a, e) => a + e.sets.length);
-    showSnack(context, 'Workout saved: $sets sets in $minutes min, about ${kcal.round()} kcal burned.');
-    Navigator.pop(context, true);
+    final reward = await Game.rewardSession(sid);
+    Social.instance.syncQuietly(reward.state);
+    final summary = await AppDb.instance.sessionSummary(sid);
+    if (!mounted || summary == null) return;
+    await Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => SessionSummaryScreen(summary: summary, reward: reward)),
+      result: true,
+    );
   }
 
   String _fmt(Duration d) {
@@ -189,7 +199,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
           actions: [
             Center(child: Text(_fmt(_elapsed), style: Theme.of(context).textTheme.titleMedium)),
             const SizedBox(width: 12),
-            FilledButton(onPressed: _finish, child: const Text('Finish')),
+            FilledButton(onPressed: _saving ? null : _finish, child: const Text('Finish')),
             const SizedBox(width: 12),
           ],
         ),
@@ -335,6 +345,108 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
           ),
         ),
       ]),
+    );
+  }
+}
+
+/// Shown after finishing a workout: XP earned, records, level and badges.
+class SessionSummaryScreen extends StatelessWidget {
+  const SessionSummaryScreen({super.key, required this.summary, required this.reward});
+  final SessionSummary summary;
+  final SessionReward reward;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final g = reward.state;
+    return Scaffold(
+      appBar: AppBar(title: Text(summary.routineName), automaticallyImplyLeading: false),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        children: [
+          const SizedBox(height: 8),
+          Center(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: reward.xp.toDouble()),
+              duration: const Duration(milliseconds: 1200),
+              curve: Curves.easeOutCubic,
+              builder: (context, v, _) => Text(
+                '+${v.round()} XP',
+                style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w900, color: xpColor),
+              ),
+            ),
+          ),
+          Center(child: Text('Workout complete', style: theme.textTheme.titleMedium)),
+          const SizedBox(height: 20),
+          if (reward.leveledUp)
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.6, end: 1),
+              duration: const Duration(milliseconds: 700),
+              curve: Curves.elasticOut,
+              builder: (context, s, child) => Transform.scale(scale: s, child: child),
+              child: Card(
+                color: xpColor.withAlpha(50),
+                child: ListTile(
+                  leading: const Icon(Icons.arrow_upward, color: xpColor, size: 32),
+                  title: Text('Level up! You are now level ${g.level}'),
+                  subtitle: Text('New title: ${g.title}'),
+                ),
+              ),
+            ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Text('Level ${g.level}', style: theme.textTheme.titleMedium),
+                  const SizedBox(width: 8),
+                  Text(g.title, style: theme.textTheme.bodyMedium?.copyWith(color: xpColor)),
+                  const Spacer(),
+                  Text('${g.xpToNext} XP to level ${g.level + 1}', style: theme.textTheme.bodySmall),
+                ]),
+                const SizedBox(height: 10),
+                AnimatedBar(value: g.levelProgress, color: xpColor, height: 10),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: StatTile(value: '${summary.sets}', label: 'sets', icon: Icons.format_list_numbered)),
+            const SizedBox(width: 8),
+            Expanded(child: StatTile(value: fmtInt(summary.volume), label: 'kg lifted', icon: Icons.fitness_center)),
+            const SizedBox(width: 8),
+            Expanded(child: StatTile(value: '${summary.durationMin}', label: 'minutes', icon: Icons.timer_outlined)),
+          ]),
+          if (reward.prs.isNotEmpty) ...[
+            const SectionHeader(title: 'New personal records'),
+            for (final name in reward.prs)
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.emoji_events, color: warnColor),
+                  title: Text(name),
+                  subtitle: const Text('Best estimated max ever'),
+                  trailing: const XpPill(XpRules.pr, done: true),
+                ),
+              ),
+          ],
+          if (g.newBadges.isNotEmpty) ...[
+            const SectionHeader(title: 'Badges unlocked'),
+            for (final b in g.newBadges)
+              Card(
+                child: ListTile(
+                  leading: CircleAvatar(backgroundColor: xpColor, child: Icon(b.icon, color: const Color(0xFF1B1F27))),
+                  title: Text(b.name),
+                  subtitle: Text(b.description),
+                ),
+              ),
+          ],
+          const SizedBox(height: 8),
+          Text('About ${summary.kcalBurned.round()} kcal burned. Your calorie target already accounts for training days.',
+              style: theme.textTheme.bodySmall),
+          const SizedBox(height: 24),
+          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
+        ],
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const weekdayShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /// Dates are stored as 'yyyy-MM-dd' strings so they sort and compare correctly.
 String dayKey(DateTime d) =>
@@ -25,6 +26,11 @@ String shiftDay(String key, int delta) {
 
 int daysBetween(DateTime a, DateTime b) => (dateOnly(b).difference(dateOnly(a)).inHours / 24).round();
 
+/// Monday of the week that contains [d].
+DateTime weekStart(DateTime d) => DateTime(d.year, d.month, d.day - (d.weekday - 1));
+
+String weekStartKey([DateTime? d]) => dayKey(weekStart(d ?? DateTime.now()));
+
 String shortDate(String key) {
   final d = parseDay(key);
   return '${d.day} ${_months[d.month - 1]}';
@@ -37,10 +43,36 @@ String prettyDay(String key) {
   return shortDate(key);
 }
 
+String greeting() {
+  final h = DateTime.now().hour;
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 /// 60 -> "60", 62.5 -> "62.5"
 String fmtW(double w) => w == w.roundToDouble() ? w.toStringAsFixed(0) : w.toStringAsFixed(1);
+
+/// 12345.6 -> "12,346"
+String fmtInt(num v) {
+  final s = v.round().abs().toString();
+  final b = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+    b.write(s[i]);
+  }
+  return v < 0 ? '-$b' : b.toString();
+}
+
+String signed(num v, {int digits = 0}) => '${v >= 0 ? '+' : ''}${v.toStringAsFixed(digits)}';
 
 double? parseNum(String s) => double.tryParse(s.trim().replaceAll(',', '.'));
 
 double minOf(Iterable<double> xs) => xs.fold<double>(double.infinity, (a, b) => a < b ? a : b);
 double maxOf(Iterable<double> xs) => xs.fold<double>(double.negativeInfinity, (a, b) => a > b ? a : b);
+
+String firstName(String name) {
+  final t = name.trim();
+  if (t.isEmpty) return '';
+  return t.split(RegExp(r'\s+')).first;
+}

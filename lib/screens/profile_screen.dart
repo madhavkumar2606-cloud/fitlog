@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../db.dart';
 import '../models.dart';
+import '../session.dart';
 import '../util.dart';
 import '../widgets.dart';
 
@@ -24,6 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const _cutRates = [0.25, 0.5, 0.75];
   static const _bulkRates = [0.1, 0.25, 0.5];
 
+  final _name = TextEditingController();
   final _age = TextEditingController();
   final _height = TextEditingController();
   final _weight = TextEditingController();
@@ -36,6 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    _name.text = AppSession.instance.me?.displayName ?? '';
     _load();
   }
 
@@ -43,6 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final p = await AppDb.instance.getProfile();
     if (p == null || !mounted) return;
     setState(() {
+      if (p.name.isNotEmpty) _name.text = p.name;
       _sex = p.sex;
       _age.text = '${p.age}';
       _height.text = fmtW(p.heightCm);
@@ -56,6 +60,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    _name.dispose();
     _age.dispose();
     _height.dispose();
     _weight.dispose();
@@ -65,9 +70,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<double> get _rates => _goal == 'bulk' ? _bulkRates : _cutRates;
 
   Future<void> _save() async {
+    final name = _name.text.trim();
     final age = int.tryParse(_age.text.trim());
     final h = parseNum(_height.text);
     final w = parseNum(_weight.text);
+    if (name.isEmpty) {
+      showSnack(context, 'Add your name so FitLog knows what to call you.');
+      return;
+    }
     if (age == null || age < 16 || age > 100 || h == null || h < 120 || h > 230 || w == null || w < 30 || w > 300) {
       showSnack(context, 'Enter age (16-100), height in cm and weight in kg.');
       return;
@@ -75,6 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final rate = _goal == 'maintain' ? 0.0 : (_rates.contains(_rate) ? _rate : _rates[1]);
     final db = AppDb.instance;
     await db.saveProfile(Profile(
+      name: name,
       sex: _sex,
       age: age,
       heightCm: h,
@@ -111,6 +122,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: theme.textTheme.bodyMedium,
               ),
             ),
+          TextField(
+            controller: _name,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Your name'),
+          ),
+          const SizedBox(height: 16),
           SegmentedButton<String>(
             segments: const [
               ButtonSegment(value: 'male', label: Text('Male')),

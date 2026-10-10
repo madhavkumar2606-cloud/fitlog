@@ -20,6 +20,7 @@ class DayMacros {
 }
 
 class Profile {
+  String name;
   String sex; // 'male' | 'female'
   int age;
   double heightCm;
@@ -29,6 +30,7 @@ class Profile {
   double rate; // kg per week
 
   Profile({
+    this.name = '',
     required this.sex,
     required this.age,
     required this.heightCm,
@@ -40,6 +42,7 @@ class Profile {
 
   Map<String, Object?> toMap() => {
         'id': 1,
+        'name': name,
         'sex': sex,
         'age': age,
         'height_cm': heightCm,
@@ -50,6 +53,7 @@ class Profile {
       };
 
   factory Profile.fromMap(Map<String, Object?> m) => Profile(
+        name: (m['name'] as String?) ?? '',
         sex: m['sex'] as String,
         age: (m['age'] as num).toInt(),
         heightCm: toD(m['height_cm']),
