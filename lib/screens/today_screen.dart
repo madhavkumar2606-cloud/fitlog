@@ -10,6 +10,7 @@ import '../session.dart';
 import '../social.dart';
 import '../util.dart';
 import '../widgets.dart';
+import 'game_screen.dart';
 import 'me_screen.dart';
 import 'report_screen.dart';
 
@@ -30,6 +31,7 @@ class _TodayScreenState extends State<TodayScreen> {
   Map<String, int> _weekXp = {};
   Set<String> _trainedDays = {};
   bool _showEaten = false;
+  int _gameBest = 0;
 
   @override
   void initState() {
@@ -49,8 +51,10 @@ class _TodayScreenState extends State<TodayScreen> {
     final ws = weekStartKey();
     final weekXp = await db.xpByDay(ws);
     final trained = (await db.sessionDatesSince(ws)).toSet();
+    final gameBest = int.tryParse(await db.getMeta('game_best') ?? '') ?? 0;
     if (!mounted) return;
     setState(() {
+      _gameBest = gameBest;
       _plan = plan;
       _game = game;
       _report = report;
@@ -154,6 +158,8 @@ class _TodayScreenState extends State<TodayScreen> {
                     _questsCard(game),
                     const SizedBox(height: 10),
                     _actions(),
+                    const SizedBox(height: 10),
+                    GymDashCard(best: _gameBest, onPlayed: _load),
                     const SizedBox(height: 10),
                     if (_report != null) _reportTeaser(_report!),
                   ],

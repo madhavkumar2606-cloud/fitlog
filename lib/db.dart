@@ -7,7 +7,7 @@ import 'models.dart';
 import 'seed.dart';
 import 'util.dart';
 
-const _dbVersion = 2;
+const _dbVersion = 3;
 const guestDbFile = 'fitlog.db';
 
 const _schemaV1 = [
@@ -118,6 +118,9 @@ class AppDb {
           for (final stmt in _schemaV2) {
             await db.execute(stmt);
           }
+        }
+        if (oldVersion < 3) {
+          await addMissingFoods(db);
         }
       },
     );
