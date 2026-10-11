@@ -123,7 +123,7 @@ class Social {
     return rows.map(PublicProfile.fromMap).toList();
   }
 
-  Future<List<PublicProfile>> _profiles(List<String> ids) async {
+  Future<List<PublicProfile>> profilesByIds(List<String> ids) async {
     if (ids.isEmpty) return [];
     final rows = await _c.from('profiles').select().inFilter('id', ids);
     return rows.map(PublicProfile.fromMap).toList();
@@ -135,7 +135,7 @@ class Social {
     final otherIds = <String>[
       for (final r in rows) (r['requester'] == me ? r['addressee'] : r['requester']) as String,
     ];
-    final byId = {for (final p in await _profiles(otherIds)) p.id: p};
+    final byId = {for (final p in await profilesByIds(otherIds)) p.id: p};
     final out = <FriendLink>[];
     for (final r in rows) {
       final incoming = r['addressee'] == me;
@@ -199,7 +199,7 @@ class Social {
     final me = myId!;
     final links = await friendLinks();
     final ids = [me, for (final l in links) if (l.accepted) l.other.id];
-    final profiles = await _profiles(ids);
+    final profiles = await profilesByIds(ids);
     final rows = await _c.from('weekly_xp').select().eq('week_start', weekStartKey()).inFilter('user_id', ids);
     final xp = {for (final r in rows) r['user_id'] as String: (r['xp'] as num).toInt()};
     final workouts = {for (final r in rows) r['user_id'] as String: (r['workouts'] as num).toInt()};

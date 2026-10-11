@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'screens/access_screen.dart';
 import 'screens/auth_screen.dart';
 import 'screens/food_screen.dart';
 import 'screens/friends_screen.dart';
@@ -8,6 +9,7 @@ import 'screens/progress_screen.dart';
 import 'screens/today_screen.dart';
 import 'screens/workout_screen.dart';
 import 'session.dart';
+import 'update.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +61,7 @@ class _Gate extends StatelessWidget {
         if (session.mode == AuthMode.loading) return const _Splash();
         if (session.mode == AuthMode.signedOut) return const AuthScreen();
         if (session.needsUsername) return const UsernameScreen();
+        if (session.isAccount && session.backend && !session.hasAccess) return const AccessScreen();
         if (!session.hasBodyProfile) {
           return ProfileScreen(
             key: ValueKey('setup-${session.userId}'),
@@ -101,6 +104,14 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Updater.promptIfNeeded(context);
+    });
+  }
 
   void _go(int i) => setState(() => _index = i);
 

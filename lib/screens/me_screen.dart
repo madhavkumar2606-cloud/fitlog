@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import '../db.dart';
 import '../game.dart';
 import '../session.dart';
+import '../update.dart';
 import '../util.dart';
 import '../widgets.dart';
+import 'access_screen.dart';
 import 'auth_screen.dart';
 import 'profile_screen.dart';
 
@@ -52,6 +54,22 @@ class _MeScreenState extends State<MeScreen> {
     if (!ok || !mounted) return;
     Navigator.of(context).popUntil((r) => r.isFirst);
     await session.signOut();
+  }
+
+  Future<void> _checkUpdate() async {
+    UpdateInfo? info;
+    try {
+      info = await Updater.check();
+    } catch (_) {
+      if (mounted) showSnack(context, 'Could not check. Make sure you are online.');
+      return;
+    }
+    if (!mounted) return;
+    if (info == null) {
+      showSnack(context, AppInfo.version.isEmpty ? 'Update checks only work in the GitHub version.' : 'You have the latest version.');
+      return;
+    }
+    await Updater.showUpdateDialog(context, info);
   }
 
   void _showBadge(BadgeDef b, bool earned, String? date) {
@@ -156,6 +174,36 @@ class _MeScreenState extends State<MeScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (session.isAdmin)
+                  Card(
+                    color: xpColor.withAlpha(30),
+                    child: Column(children: [
+                      ListTile(
+                        leading: const Icon(Icons.verified_user_outlined, color: xpColor),
+                        title: const Text('Access requests'),
+                        subtitle: const Text('Approve people who paid or got a free invite'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.push(
+                            context, MaterialPageRoute(builder: (_) => const AdminAccessScreen())),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.qr_code_2, color: xpColor),
+                        title: const Text('Payment settings'),
+                        subtitle: const Text('UPI ID, price and message'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.push(
+                            context, MaterialPageRoute(builder: (_) => const PaymentSettingsScreen())),
+                      ),
+                    ]),
+                  ),
+                if (!session.isAdmin && session.access?.accessUntil != null)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.event_available, color: goodColor),
+                      title: Text('Access until ${shortDate(dayKey(session.access!.accessUntil!))}'),
+                      subtitle: const Text('You will be asked to renew after this date'),
+                    ),
+                  ),
                 Card(
                   child: Column(children: [
                     ListTile(
@@ -180,6 +228,12 @@ class _MeScreenState extends State<MeScreen> {
                           if (mounted) setState(() {});
                         },
                       ),
+                    ListTile(
+                      leading: const Icon(Icons.system_update_outlined),
+                      title: const Text('Check for updates'),
+                      subtitle: Text('You have ${AppInfo.label}'),
+                      onTap: _checkUpdate,
+                    ),
                     ListTile(
                       leading: Icon(session.isAccount ? Icons.logout : Icons.login),
                       title: Text(session.isAccount ? 'Sign out' : 'Sign in to add friends'),

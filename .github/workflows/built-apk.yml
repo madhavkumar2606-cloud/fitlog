@@ -35,7 +35,7 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GOOGLE_SIGNIN: ${{ vars.GOOGLE_SIGNIN }}
         run: |
-          python3 -c "import json, os; json.dump({'SUPABASE_URL': os.environ.get('SUPABASE_URL', ''), 'SUPABASE_KEY': os.environ.get('SUPABASE_KEY', ''), 'GOOGLE_SIGNIN': os.environ.get('GOOGLE_SIGNIN') or 'false'}, open('env.json', 'w'))"
+          python3 -c "import json, os, re; tag = os.environ.get('GITHUB_REF_NAME', ''); ver = tag[1:] if re.fullmatch(r'v\d+\.\d+\.\d+', tag) else ''; json.dump({'SUPABASE_URL': os.environ.get('SUPABASE_URL', ''), 'SUPABASE_KEY': os.environ.get('SUPABASE_KEY', ''), 'GOOGLE_SIGNIN': os.environ.get('GOOGLE_SIGNIN') or 'false', 'APP_VERSION': ver}, open('env.json', 'w')); open(os.environ['GITHUB_ENV'], 'a').write('BUILD_NAME=' + (ver or '0.0.0') + '\\n')"
 
       # Optional: permanent signing key so updates install over the old version.
       - name: Set up signing key
@@ -49,7 +49,9 @@ jobs:
 
       - run: flutter pub get
 
-      - run: flutter build apk --release --dart-define-from-file=env.json
+      # Version name comes from the tag (v2.2.0 -> 2.2.0); the build number always goes up,
+      # which Android needs to install an update over an older version.
+      - run: flutter build apk --release --dart-define-from-file=env.json --build-name=${{ env.BUILD_NAME }} --build-number=${{ github.run_number }}
 
       - name: Rename APK
         run: mv build/app/outputs/flutter-apk/app-release.apk FitLog.apk

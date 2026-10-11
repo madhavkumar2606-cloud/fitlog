@@ -184,14 +184,11 @@ class _AuthScreenState extends State<AuthScreen> {
                 label: const Text('Continue with Google'),
               ),
               ],
-              const SizedBox(height: 24),
-              TextButton(
-                onPressed: _busy ? null : AppSession.instance.continueAsGuest,
-                child: const Text('Use without an account'),
-              ),
+              const SizedBox(height: 20),
               Text(
-                'Without an account your data stays on this phone and you cannot add friends. '
-                'If you sign in later, your data moves into your account.',
+                _creating
+                    ? 'After creating your account you can request access. Your data stays private on your phone.'
+                    : 'New here? Tap Create account, then request access.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall,
               ),

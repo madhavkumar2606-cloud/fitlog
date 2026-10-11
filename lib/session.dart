@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'access.dart';
 import 'config.dart';
 import 'db.dart';
 import 'social.dart';
@@ -20,6 +21,9 @@ class AppSession extends ChangeNotifier {
   PublicProfile? me;
   bool needsUsername = false;
   bool hasBodyProfile = false;
+  bool hasAccess = true;
+  bool isAdmin = false;
+  AccessRequest? access;
   bool _switching = false;
   StreamSubscription<AuthState>? _sub;
 
@@ -42,7 +46,8 @@ class AppSession extends ChangeNotifier {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('guest') ?? false) {
+    // Offline guest mode only exists in builds without a backend (access needs approval).
+    if (!backend && (prefs.getBool('guest') ?? false)) {
       await continueAsGuest();
       return;
     }
@@ -80,8 +85,14 @@ class AppSession extends ChangeNotifier {
         me = null;
         needsUsername = false;
       }
+      if (!needsUsername) await _loadAccess(uid);
       hasBodyProfile = await AppDb.instance.getProfile() != null;
       mode = AuthMode.account;
+    } catch (e) {
+      // Never leave people stuck on the loading screen.
+      debugPrint('Could not open account: $e');
+      userId = null;
+      mode = AuthMode.signedOut;
     } finally {
       _switching = false;
       notifyListeners();
@@ -95,6 +106,9 @@ class AppSession extends ChangeNotifier {
     userId = null;
     me = null;
     needsUsername = false;
+    hasAccess = true;
+    isAdmin = false;
+    access = null;
     hasBodyProfile = await AppDb.instance.getProfile() != null;
     _set(AuthMode.guest);
   }
@@ -106,6 +120,8 @@ class AppSession extends ChangeNotifier {
     userId = null;
     me = null;
     needsUsername = false;
+    isAdmin = false;
+    access = null;
     _set(AuthMode.signedOut);
   }
 
@@ -118,9 +134,39 @@ class AppSession extends ChangeNotifier {
     await _toSignedOut();
   }
 
-  void profileSaved(PublicProfile p) {
+  Future<void> profileSaved(PublicProfile p) async {
     me = p;
     needsUsername = false;
+    if (userId != null) await _loadAccess(userId!);
+    notifyListeners();
+  }
+
+  /// Checks with the server whether this account is approved. Falls back to the last
+  /// known answer when offline, so approved people can still use the app without internet.
+  Future<void> _loadAccess(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'access_until_$uid';
+    try {
+      isAdmin = await AccessService.instance.isAdmin();
+      access = await AccessService.instance.myRequest();
+      hasAccess = isAdmin || (access?.active ?? false);
+      if (hasAccess) {
+        final until = isAdmin ? null : access?.accessUntil;
+        await prefs.setString(key, until == null ? 'forever' : until.toIso8601String());
+      } else {
+        await prefs.remove(key);
+      }
+    } catch (e) {
+      final cached = prefs.getString(key);
+      hasAccess = cached != null &&
+          (cached == 'forever' || (DateTime.tryParse(cached)?.isAfter(DateTime.now()) ?? false));
+    }
+  }
+
+  Future<void> refreshAccess() async {
+    final uid = userId;
+    if (uid == null) return;
+    await _loadAccess(uid);
     notifyListeners();
   }
 

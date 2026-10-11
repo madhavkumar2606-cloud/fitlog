@@ -49,6 +49,11 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Lets the app open UPI apps (GPay, PhonePe, Paytm) for payment. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="upi"/>
+        </intent>
         <!-- Lets the app open the browser for Google sign-in. -->
         <intent>
             <action android:name="android.intent.action.VIEW"/>
