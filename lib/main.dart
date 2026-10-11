@@ -7,9 +7,10 @@ import 'screens/friends_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/progress_screen.dart';
 import 'screens/today_screen.dart';
-import 'screens/workout_screen.dart';
+import 'screens/train_screen.dart';
 import 'session.dart';
 import 'update.dart';
+import 'visuals.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,7 +38,34 @@ class FitLogApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: scheme,
-        scaffoldBackgroundColor: const Color(0xFF18202B),
+        scaffoldBackgroundColor: const Color(0xFF151C26),
+        appBarTheme: const AppBarThemeData(
+          backgroundColor: Color(0xF0151C26),
+          surfaceTintColor: Colors.transparent,
+          scrolledUnderElevation: 0,
+          titleTextStyle: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white),
+        ),
+        cardTheme: CardThemeData(
+          color: const Color(0xE61F2833),
+          elevation: 0,
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: Colors.white.withAlpha(18)),
+          ),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          height: 68,
+          backgroundColor: const Color(0xFF111821),
+          indicatorColor: const Color(0x40F4A259),
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => TextStyle(
+              fontSize: 12,
+              fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w500,
+            ),
+          ),
+        ),
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
           isDense: true,
@@ -125,7 +153,14 @@ class _HomeShellState extends State<HomeShell> {
       const FriendsScreen(),
     ];
     return Scaffold(
-      body: pages[_index],
+      backgroundColor: const Color(0xFF121820),
+      body: Stack(children: [
+        const Positioned.fill(child: AppBackground()),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: KeyedSubtree(key: ValueKey(_index), child: pages[_index]),
+        ),
+      ]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: _go,

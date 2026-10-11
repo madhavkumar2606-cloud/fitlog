@@ -566,6 +566,34 @@ class AppDb {
     return out;
   }
 
+  /// Most recent workout date for each routine.
+  Future<Map<int, String>> routineLastDone() async {
+    final rows = await (await db).rawQuery(
+        'SELECT routine_id, MAX(date) AS d FROM session WHERE routine_id IS NOT NULL GROUP BY routine_id');
+    return {for (final r in rows) r['routine_id'] as int: r['d'] as String};
+  }
+
+  /// Most recent date each muscle group was trained.
+  Future<Map<String, String>> muscleLastTrained() async {
+    final rows = await (await db).rawQuery('''
+      SELECT e.muscle AS muscle, MAX(s.date) AS d FROM set_log l
+      JOIN session s ON s.id = l.session_id JOIN exercise e ON e.id = l.exercise_id
+      GROUP BY e.muscle''');
+    return {for (final r in rows) r['muscle'] as String: r['d'] as String};
+  }
+
+  /// Number of personal records set in each workout.
+  Future<Map<int, int>> prCountsBySession() async {
+    final rows = await (await db).query('xp_event', columns: ['ref'], where: "kind = 'pr'");
+    final out = <int, int>{};
+    for (final r in rows) {
+      final ref = r['ref'] as String; // S<session>:E<exercise>
+      final sid = int.tryParse(ref.split(':').first.substring(1));
+      if (sid != null) out[sid] = (out[sid] ?? 0) + 1;
+    }
+    return out;
+  }
+
   Future<List<Exercise>> exercisesWithHistory() async {
     final rows = await (await db).rawQuery('''
       SELECT DISTINCT e.id, e.name, e.muscle FROM exercise e

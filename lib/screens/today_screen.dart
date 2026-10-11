@@ -139,6 +139,7 @@ class _TodayScreenState extends State<TodayScreen> {
     final plan = _plan;
     final game = _game;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: plan == null || game == null
             ? const Center(child: CircularProgressIndicator())
@@ -205,27 +206,66 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   Widget _levelCard(GameState g) {
-    final theme = Theme.of(context);
-    return Card(
-      clipBehavior: Clip.antiAlias,
+    const ink = Color(0xFF1B1F27);
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
+        borderRadius: BorderRadius.circular(26),
         onTap: _openMe,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Text('Level ${g.level}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(width: 8),
-              Text(g.title, style: theme.textTheme.bodyMedium?.copyWith(color: xpColor)),
-              const Spacer(),
-              if (g.todayXp > 0) XpPill(g.todayXp, done: true),
-            ]),
-            const SizedBox(height: 10),
-            AnimatedBar(value: g.levelProgress, color: xpColor, height: 10),
-            const SizedBox(height: 6),
-            Text(
-              '${fmtInt(g.xpToNext)} XP to level ${g.level + 1}. ${fmtInt(g.weekXp)} XP this week.',
-              style: theme.textTheme.bodySmall,
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(26),
+            gradient: const LinearGradient(
+              colors: [Color(0xFFB794F6), Color(0xFF7F5AD5)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: const [BoxShadow(color: Color(0x557F5AD5), blurRadius: 22, offset: Offset(0, 8))],
+          ),
+          child: Row(children: [
+            Container(
+              width: 62,
+              height: 62,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withAlpha(70),
+                border: Border.all(color: Colors.white.withAlpha(140), width: 2),
+              ),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Text('LVL', style: TextStyle(color: ink, fontSize: 10, fontWeight: FontWeight.w800)),
+                Text('${g.level}', style: const TextStyle(color: ink, fontSize: 24, fontWeight: FontWeight.w900, height: 1)),
+              ]),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(g.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: ink, fontSize: 18, fontWeight: FontWeight.w900)),
+                  ),
+                  if (g.todayXp > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: Colors.white.withAlpha(90), borderRadius: BorderRadius.circular(10)),
+                      child: Text('+${g.todayXp} today', style: const TextStyle(color: ink, fontSize: 12, fontWeight: FontWeight.w800)),
+                    ),
+                ]),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: AnimatedBar(value: g.levelProgress, color: Colors.white, height: 10),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${fmtInt(g.xpToNext)} XP to level ${g.level + 1}  |  ${fmtInt(g.weekXp)} XP this week',
+                  style: const TextStyle(color: ink, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ]),
             ),
           ]),
         ),

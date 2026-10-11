@@ -26,6 +26,21 @@ const avatarColors = <Color>[
   Color(0xFFF687B3),
 ];
 
+const muscleColors = <String, Color>{
+  'Chest': Color(0xFFF4A259),
+  'Back': Color(0xFF7FB2F0),
+  'Shoulders': Color(0xFFB794F6),
+  'Biceps': Color(0xFF4FD1C5),
+  'Triceps': Color(0xFFE8C547),
+  'Quads': Color(0xFF6FCF97),
+  'Hamstrings': Color(0xFFF2777A),
+  'Glutes': Color(0xFFF687B3),
+  'Calves': Color(0xFF63B3ED),
+  'Core': Color(0xFFA0AEC0),
+};
+
+Color muscleColor(String m) => muscleColors[m] ?? const Color(0xFF9AA5B1);
+
 Color avatarColor(int i) => avatarColors[i.abs() % avatarColors.length];
 
 String initials(String name) {

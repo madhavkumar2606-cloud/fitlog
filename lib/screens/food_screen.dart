@@ -6,6 +6,7 @@ import '../food_api.dart';
 import '../models.dart';
 import '../planner.dart';
 import '../util.dart';
+import '../visuals.dart';
 import '../widgets.dart';
 
 const meals = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -20,6 +21,7 @@ class FoodScreen extends StatefulWidget {
 class _FoodScreenState extends State<FoodScreen> {
   String _date = todayKey();
   List<FoodEntry> _entries = [];
+  List<Food> _recent = [];
   DailyTarget? _target;
   bool _loading = true;
 
@@ -33,10 +35,12 @@ class _FoodScreenState extends State<FoodScreen> {
     final date = _date;
     final entries = await AppDb.instance.entriesFor(date);
     final plan = await loadPlan(date);
+    final recent = await AppDb.instance.recentFoods();
     if (!mounted || date != _date) return;
     setState(() {
       _entries = entries;
       _target = plan.target;
+      _recent = recent.take(8).toList();
       _loading = false;
     });
   }
@@ -55,6 +59,23 @@ class _FoodScreenState extends State<FoodScreen> {
     if (added == true) await _load();
   }
 
+  String _mealForNow() {
+    final h = DateTime.now().hour;
+    if (h < 11) return 'Breakfast';
+    if (h < 16) return 'Lunch';
+    if (h < 18) return 'Snacks';
+    return 'Dinner';
+  }
+
+  Future<void> _quickAdd(Food f) async {
+    final meal = _mealForNow();
+    final grams = f.servingG > 0 ? f.servingG : 100.0;
+    await AppDb.instance.addFoodEntry(date: _date, meal: meal, food: f, grams: grams);
+    if (!mounted) return;
+    showSnack(context, 'Added ${fmtW(grams)} g ${f.name} to $meal');
+    await _load();
+  }
+
   Future<void> _editGrams(FoodEntry e) async {
     final g = await askNumber(context, title: e.name, initial: fmtW(e.grams), suffix: 'g');
     if (g == null || g <= 0) return;
@@ -68,6 +89,7 @@ class _FoodScreenState extends State<FoodScreen> {
     final t = _target;
     final isToday = _date == todayKey();
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Food'),
         actions: [
@@ -82,77 +104,245 @@ class _FoodScreenState extends State<FoodScreen> {
       ),
       body: _loading || t == null
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(children: [
-                      MacroBar(
-                        label: 'Calories',
-                        value: totals.kcal,
-                        target: t.kcal,
-                        color: Theme.of(context).colorScheme.primary,
-                        unit: 'kcal',
-                      ),
-                      MacroBar(label: 'Protein', value: totals.protein, target: t.protein, color: proteinColor),
-                      MacroBar(label: 'Carbs', value: totals.carbs, target: t.carbs, color: carbsColor),
-                      MacroBar(label: 'Fat', value: totals.fat, target: t.fat, color: fatColor),
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  _hero(totals, t),
+                  if (_recent.isNotEmpty && isToday) ...[
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      Text('Quick add', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                      const SizedBox(width: 8),
+                      Text('one tap, adds to ${_mealForNow()}', style: Theme.of(context).textTheme.bodySmall),
                     ]),
-                  ),
-                ),
-                for (final meal in meals) ..._mealSection(meal),
-              ],
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 92,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _recent.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 10),
+                        itemBuilder: (context, i) => _quickChip(_recent[i]),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  for (final meal in meals) _mealCard(meal, t),
+                ],
+              ),
             ),
     );
   }
 
-  List<Widget> _mealSection(String meal) {
+  Widget _hero(Macros totals, DailyTarget t) {
+    final theme = Theme.of(context);
+    final left = t.kcal - totals.kcal;
+    final over = left < 0;
+    final pct = t.kcal <= 0 ? 0.0 : totals.kcal / t.kcal;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2A3A4F), Color(0xFF1F2833)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: Colors.white.withAlpha(20)),
+      ),
+      child: Column(children: [
+        Row(children: [
+          AnimatedRing(
+            value: pct,
+            color: over ? theme.colorScheme.error : theme.colorScheme.primary,
+            size: 140,
+            stroke: 14,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(fmtInt(left.abs()), style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900)),
+              Text(over ? 'kcal over' : 'kcal left', style: theme.textTheme.labelSmall),
+            ]),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _heroLine('🎯', 'Target', '${fmtInt(t.kcal)} kcal'),
+              _heroLine('🍽️', 'Eaten', '${fmtInt(totals.kcal)} kcal'),
+              if (t.trainingDay) _heroLine('🏋️', 'Gym day', 'extra fuel'),
+              const SizedBox(height: 6),
+              Text(
+                over
+                    ? 'A bit over today. No stress, tomorrow is a fresh start.'
+                    : pct < 0.25
+                        ? 'Plenty of room. Start with a protein-rich meal.'
+                        : pct < 0.85
+                            ? 'On track. Keep the protein coming.'
+                            : 'Almost there. A light snack fits.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 18),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+          MacroRing(label: 'Protein', value: totals.protein, target: t.protein, color: proteinColor),
+          MacroRing(label: 'Carbs', value: totals.carbs, target: t.carbs, color: carbsColor),
+          MacroRing(label: 'Fat', value: totals.fat, target: t.fat, color: fatColor),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _heroLine(String emoji, String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(children: [
+          Text(emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 6),
+          Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+        ]),
+      );
+
+  Widget _quickChip(Food f) {
+    return Material(
+      color: Colors.white.withAlpha(14),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _quickAdd(f),
+        child: SizedBox(
+          width: 96,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(foodEmoji(f.name), style: const TextStyle(fontSize: 28)),
+              const SizedBox(height: 4),
+              Text(f.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              Text('${(f.kcal * (f.servingG > 0 ? f.servingG : 100) / 100).round()} kcal',
+                  style: Theme.of(context).textTheme.labelSmall),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static const _mealShare = {'Breakfast': 0.25, 'Lunch': 0.35, 'Dinner': 0.30, 'Snacks': 0.10};
+  static const _mealColors = {
+    'Breakfast': Color(0xFFF2C94C),
+    'Lunch': Color(0xFFF4A259),
+    'Dinner': Color(0xFF7FB2F0),
+    'Snacks': Color(0xFF6FCF97),
+  };
+
+  Widget _mealCard(String meal, DailyTarget t) {
     final theme = Theme.of(context);
     final items = _entries.where((e) => e.meal == meal).toList();
     final sub = items.fold<double>(0, (a, e) => a + e.macros.kcal);
-    return [
-      Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Row(children: [
-          Text(meal, style: theme.textTheme.titleMedium),
-          const SizedBox(width: 8),
-          if (sub > 0) Text('${sub.round()} kcal', style: theme.textTheme.bodySmall),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline),
-            tooltip: 'Add food to $meal',
-            onPressed: () => _add(meal),
-          ),
-        ]),
+    final goal = t.kcal * (_mealShare[meal] ?? 0.25);
+    final c = _mealColors[meal] ?? theme.colorScheme.primary;
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        color: const Color(0xFF1F2833),
+        border: Border.all(color: c.withAlpha(50)),
       ),
-      for (final e in items)
-        Dismissible(
-          key: ValueKey(e.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 16),
-            color: theme.colorScheme.errorContainer,
-            child: Icon(Icons.delete_outline, color: theme.colorScheme.onErrorContainer),
-          ),
-          onDismissed: (_) {
-            setState(() => _entries.removeWhere((x) => x.id == e.id));
-            AppDb.instance.deleteEntry(e.id);
-          },
-          child: ListTile(
-            dense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-            title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Text('${fmtW(e.grams)} g   P ${e.macros.protein.round()}   '
-                'C ${e.macros.carbs.round()}   F ${e.macros.fat.round()}'),
-            trailing: Text('${e.macros.kcal.round()} kcal'),
-            onTap: () => _editGrams(e),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: [
+        InkWell(
+          onTap: () => _add(meal),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Row(children: [
+              Container(
+                width: 48,
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: c.withAlpha(45), borderRadius: BorderRadius.circular(16)),
+                child: Text(mealEmoji[meal] ?? '🍽️', style: const TextStyle(fontSize: 26)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Text(meal, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    const Spacer(),
+                    Text(sub > 0 ? '${sub.round()} kcal' : 'about ${goal.round()} kcal',
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: sub > 0 ? FontWeight.w700 : null)),
+                  ]),
+                  const SizedBox(height: 6),
+                  AnimatedBar(value: goal <= 0 ? 0 : (sub / goal).clamp(0.0, 1.0).toDouble(), color: c, height: 7),
+                ]),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.add_circle, color: c, size: 30),
+            ]),
           ),
         ),
-    ];
+        for (final e in items)
+          Dismissible(
+            key: ValueKey(e.id),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 16),
+              color: theme.colorScheme.errorContainer,
+              child: Icon(Icons.delete_outline, color: theme.colorScheme.onErrorContainer),
+            ),
+            onDismissed: (_) {
+              setState(() => _entries.removeWhere((x) => x.id == e.id));
+              AppDb.instance.deleteEntry(e.id);
+            },
+            child: InkWell(
+              onTap: () => _editGrams(e),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+                child: Row(children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: Colors.white.withAlpha(12), shape: BoxShape.circle),
+                    child: Text(foodEmoji(e.name), style: const TextStyle(fontSize: 20)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 3),
+                      Row(children: [
+                        Text('${fmtW(e.grams)} g', style: theme.textTheme.bodySmall),
+                        const SizedBox(width: 8),
+                        _macroDot(proteinColor, 'P', e.macros.protein),
+                        _macroDot(carbsColor, 'C', e.macros.carbs),
+                        _macroDot(fatColor, 'F', e.macros.fat),
+                      ]),
+                    ]),
+                  ),
+                  Text('${e.macros.kcal.round()}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  Text(' kcal', style: theme.textTheme.bodySmall),
+                ]),
+              ),
+            ),
+          ),
+        if (items.isNotEmpty) const SizedBox(height: 6),
+      ]),
+    );
   }
+
+  Widget _macroDot(Color c, String l, double v) => Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 7, height: 7, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+          const SizedBox(width: 3),
+          Text('$l ${v.round()}', style: const TextStyle(fontSize: 11)),
+        ]),
+      );
 }
 
 class FoodSearchScreen extends StatefulWidget {
@@ -295,7 +485,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   Widget _foodTile(Food f, {bool online = false}) {
     return ListTile(
-      leading: online ? const Icon(Icons.public) : null,
+      leading: CircleAvatar(
+        backgroundColor: Colors.white.withAlpha(14),
+        child: online ? const Icon(Icons.public, size: 20) : Text(foodEmoji(f.name), style: const TextStyle(fontSize: 20)),
+      ),
       title: Text(f.name, maxLines: 2, overflow: TextOverflow.ellipsis),
       subtitle: Text('Per 100 g: ${f.kcal.round()} kcal   P ${f.protein.toStringAsFixed(1)}   '
           'C ${f.carbs.toStringAsFixed(1)}   F ${f.fat.toStringAsFixed(1)}'),

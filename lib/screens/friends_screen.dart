@@ -15,10 +15,12 @@ class FriendsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = AppSession.instance;
     if (!session.isAccount || !Social.instance.available) {
-      return Scaffold(appBar: AppBar(title: const Text('Friends')), body: const _SignInPitch());
+      return Scaffold(
+          backgroundColor: Colors.transparent, appBar: AppBar(title: const Text('Friends')), body: const _SignInPitch());
     }
     if (session.me == null) {
       return Scaffold(
+        backgroundColor: Colors.transparent,
         appBar: AppBar(title: const Text('Friends')),
         body: const EmptyNote('Could not reach the server. Check your internet, then reopen the app.'),
       );
@@ -26,6 +28,7 @@ class FriendsScreen extends StatelessWidget {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('Friends'),
           bottom: const TabBar(tabs: [Tab(text: 'Leaderboard'), Tab(text: 'Friends')]),
