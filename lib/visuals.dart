@@ -1,502 +1,480 @@
 import 'dart:math' as math;
+import 'dart:ui' show PointMode;
 
 import 'package:flutter/material.dart';
 
-// ---------------- App background ----------------
+/// Sumi design language: washi paper, black ink, ensō circles, serif numbers.
+class Sumi {
+  static const ink = Color(0xFF151413);
+  static const ink2 = Color(0xFF3A3836);
+  static const muted = Color(0xFF6D675E);
+  static const faint = Color(0xFF9A948A);
+  static const rule = Color(0xFFDDD7CC);
+  static const edge = Color(0xFFCFC8BB);
+  static const paper = Color(0xFFEEEBE5);
+  static const porcelain = Color(0xFFFAF8F4);
+  static const sheet = Color(0xFFF3F0EA);
+  static const wash = Color(0xFFE3DED4);
+  static const error = Color(0xFF8E2F25);
+  static const serif = 'InstrumentSerif';
+  static const sans = 'InterTight';
+}
 
-/// Deep navy gradient with two soft coloured glows. Used behind the main tabs.
-class AppBackground extends StatelessWidget {
-  const AppBackground({super.key});
+/// Serif text style for titles and numbers.
+TextStyle serif(double size, {Color? color, bool italic = false, double height = 1.05}) => TextStyle(
+      fontFamily: Sumi.serif,
+      fontSize: size,
+      fontWeight: FontWeight.w400,
+      fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+      color: color ?? Sumi.ink,
+      height: height,
+      letterSpacing: -0.2,
+    );
 
-  Widget _glow(Color c, double size) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [c.withAlpha(70), c.withAlpha(0)]),
+/// Small, widely spaced uppercase label.
+class SumiLabel extends StatelessWidget {
+  const SumiLabel(this.text, {super.key, this.color, this.size = 10});
+  final String text;
+  final Color? color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          fontFamily: Sumi.sans,
+          fontSize: size,
+          letterSpacing: 2.2,
+          fontWeight: FontWeight.w500,
+          color: color ?? Sumi.muted,
         ),
       );
+}
+
+// ---------- Paper ----------
+
+/// Washi paper: warm off-white with a faint fibre dot texture.
+class AppBackground extends StatelessWidget {
+  const AppBackground({super.key, this.dark = false});
+  final bool dark;
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: Stack(children: [
-        Positioned.fill(
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF1A2333), Color(0xFF121820)],
-              ),
-            ),
-          ),
-        ),
-        Positioned(top: -120, right: -100, child: _glow(const Color(0xFFF4A259), 340)),
-        Positioned(top: 260, left: -140, child: _glow(const Color(0xFFB794F6), 320)),
-        Positioned(bottom: -160, right: -60, child: _glow(const Color(0xFF4FD1C5), 300)),
-      ]),
-    );
-  }
-}
-
-// ---------------- Gradient button ----------------
-
-class GradientButton extends StatelessWidget {
-  const GradientButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-    this.icon,
-    this.colors = const [Color(0xFFF4A259), Color(0xFFE76F51)],
-    this.height = 56,
-  });
-  final String label;
-  final VoidCallback? onPressed;
-  final IconData? icon;
-  final List<Color> colors;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: Container(
-        height: height,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(height / 2),
-          gradient: LinearGradient(colors: colors),
-          boxShadow: [BoxShadow(color: colors.last.withAlpha(90), blurRadius: 18, offset: const Offset(0, 6))],
-        ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(height / 2),
-            onTap: onPressed,
-            child: Center(
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                if (icon != null) Icon(icon, color: const Color(0xFF1B1F27)),
-                if (icon != null) const SizedBox(width: 8),
-                Text(label,
-                    style: const TextStyle(color: Color(0xFF1B1F27), fontSize: 17, fontWeight: FontWeight.w800)),
-              ]),
-            ),
-          ),
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: _PaperPainter(dark),
+          child: const SizedBox.expand(),
         ),
       ),
     );
   }
 }
 
-// ---------------- Food emoji ----------------
-
-const _foodEmoji = <String, String>{
-  'omelette': '🍳', 'omlet': '🍳', 'bhurji': '🍳', 'egg': '🥚', 'chicken': '🍗', 'tandoori': '🍗',
-  'mutton': '🍖', 'keema': '🍖', 'fish': '🐟', 'prawn': '🦐', 'salmon': '🐟', 'tuna': '🐟',
-  'biryani': '🍛', 'pulao': '🍛', 'fried rice': '🍛', 'rice': '🍚', 'khichdi': '🍚', 'pongal': '🍚',
-  'dosa': '🥞', 'uttapam': '🥞', 'pesarattu': '🥞', 'idli': '⚪', 'appam': '🥞', 'vada': '🍩',
-  'roti': '🫓', 'chapati': '🫓', 'paratha': '🫓', 'naan': '🫓', 'kulcha': '🫓', 'thepla': '🫓', 'puri': '🫓',
-  'bhatura': '🫓', 'bread': '🍞', 'toast': '🍞', 'pav': '🍞', 'rusk': '🍞', 'jam': '🍓', 'butter': '🧈',
-  'cheese': '🧀', 'paneer': '🧀', 'tofu': '🧀', 'dal': '🥣', 'sambar': '🥣', 'rasam': '🥣', 'rajma': '🫘',
-  'chana': '🫘', 'chole': '🫘', 'soya': '🫘', 'sprouts': '🌱', 'curry': '🍲', 'gravy': '🍲', 'masala': '🍲',
-  'kurma': '🍲', 'kadhi': '🍲', 'upma': '🥣', 'poha': '🥣', 'oats': '🥣', 'porridge': '🥣', 'dalia': '🥣',
-  'muesli': '🥣', 'cornflakes': '🥣', 'milk': '🥛', 'curd': '🥛', 'dahi': '🥛', 'yogurt': '🥛', 'lassi': '🥛',
-  'buttermilk': '🥛', 'raita': '🥛', 'whey': '🥤', 'shake': '🥤', 'protein': '💪', 'tea': '🍵', 'coffee': '☕',
-  'juice': '🧃', 'coconut': '🥥', 'cola': '🥤', 'soft drink': '🥤', 'banana': '🍌', 'apple': '🍎',
-  'mango': '🥭', 'orange': '🍊', 'grapes': '🍇', 'watermelon': '🍉', 'pineapple': '🍍', 'papaya': '🍈',
-  'guava': '🍐', 'pomegranate': '🍎', 'dates': '🌴', 'raisins': '🍇', 'almond': '🌰', 'cashew': '🌰',
-  'walnut': '🌰', 'peanut': '🥜', 'seeds': '🌰', 'makhana': '🍿', 'popcorn': '🍿', 'potato': '🥔',
-  'aloo': '🥔', 'fries': '🍟', 'chips': '🍟', 'corn': '🌽', 'carrot': '🥕', 'tomato': '🍅', 'onion': '🧅',
-  'cucumber': '🥒', 'broccoli': '🥦', 'salad': '🥗', 'palak': '🥬', 'bhindi': '🥬', 'gobi': '🥦',
-  'baingan': '🍆', 'samosa': '🥟', 'momos': '🥟', 'pakora': '🧆', 'bajji': '🧆', 'bonda': '🧆',
-  'dhokla': '🟨', 'noodles': '🍜', 'maggi': '🍜', 'pasta': '🍝', 'pizza': '🍕', 'burger': '🍔',
-  'sandwich': '🥪', 'roll': '🌯', 'shawarma': '🌯', 'gulab': '🍡', 'rasgulla': '🍡', 'jalebi': '🥨',
-  'kheer': '🍮', 'payasam': '🍮', 'halwa': '🍮', 'laddu': '🟠', 'chocolate': '🍫', 'nutella': '🍫',
-  'ice cream': '🍨', 'honey': '🍯', 'sugar': '🍬', 'biscuit': '🍪', 'chikki': '🍬', 'bar': '🍫',
-  'ghee': '🧈', 'oil': '🫒', 'pickle': '🫙', 'chutney': '🫙', 'mayonnaise': '🫙', 'quinoa': '🥣',
-  'ragi': '🟤', 'bajra': '🫓', 'jowar': '🫓', 'sabudana': '🥣', 'bhel': '🥗', 'pani puri': '🥟',
-  'murukku': '🥨', 'mixture': '🥨', 'namkeen': '🥨',
-};
-
-// Longer keys first so "fried rice" beats "rice" and "pani puri" beats "puri".
-final _emojiKeys = _foodEmoji.keys.toList()..sort((a, b) => b.length.compareTo(a.length));
-
-/// Picks a friendly emoji for a food name.
-String foodEmoji(String name) {
-  final n = name.toLowerCase();
-  for (final k in _emojiKeys) {
-    if (n.contains(k)) return _foodEmoji[k]!;
-  }
-  return '🍽️';
-}
-
-const mealEmoji = {'Breakfast': '🍳', 'Lunch': '🍛', 'Dinner': '🍲', 'Snacks': '🍎'};
-
-// ---------------- Animated lifter ----------------
-
-enum LiftKind { press, benchPress, pull, verticalPull, squat, hinge, curl, raise, calf, plank }
-
-LiftKind liftKindFor(String exercise, String muscle) {
-  final n = exercise.toLowerCase();
-  bool has(String s) => n.contains(s);
-  if (has('plank') || has('leg raise')) return LiftKind.plank;
-  if (has('calf')) return LiftKind.calf;
-  if (has('bench') || has('chest press') || has('incline') || has('fly') || has('skull')) return LiftKind.benchPress;
-  if (has('pull-up') || has('pull up') || has('pulldown') || has('chin')) return LiftKind.verticalPull;
-  if (has('row') || has('face pull') || has('shrug')) return LiftKind.pull;
-  if (has('deadlift') || has('hip thrust') || has('good morning') || has('leg curl')) return LiftKind.hinge;
-  if (has('squat') || has('leg press') || has('lunge') || has('extension')) return LiftKind.squat;
-  if (has('curl')) return LiftKind.curl;
-  if (has('raise')) return LiftKind.raise;
-  if (has('press') || has('dip') || has('pushdown')) return LiftKind.press;
-  switch (muscle) {
-    case 'Back':
-      return LiftKind.pull;
-    case 'Quads':
-    case 'Glutes':
-      return LiftKind.squat;
-    case 'Hamstrings':
-      return LiftKind.hinge;
-    case 'Biceps':
-      return LiftKind.curl;
-    case 'Calves':
-      return LiftKind.calf;
-    case 'Core':
-      return LiftKind.plank;
-    default:
-      return LiftKind.press;
-  }
-}
-
-/// Joint positions in a 100 x 100 box (y grows downwards).
-class _Pose {
-  const _Pose(this.head, this.neck, this.hip, this.knee, this.foot, this.elbow, this.hand);
-  final Offset head, neck, hip, knee, foot, elbow, hand;
-
-  static _Pose lerp(_Pose a, _Pose b, double t) => _Pose(
-        Offset.lerp(a.head, b.head, t)!,
-        Offset.lerp(a.neck, b.neck, t)!,
-        Offset.lerp(a.hip, b.hip, t)!,
-        Offset.lerp(a.knee, b.knee, t)!,
-        Offset.lerp(a.foot, b.foot, t)!,
-        Offset.lerp(a.elbow, b.elbow, t)!,
-        Offset.lerp(a.hand, b.hand, t)!,
-      );
-}
-
-const _standHead = Offset(50, 16), _standNeck = Offset(50, 27), _standHip = Offset(50, 58);
-const _standKnee = Offset(51, 78), _standFoot = Offset(50, 97);
-
-const _poses = <LiftKind, List<_Pose>>{
-  LiftKind.press: [
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(63, 36), Offset(58, 25)),
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(57, 13), Offset(54, 1)),
-  ],
-  LiftKind.benchPress: [
-    _Pose(Offset(18, 58), Offset(27, 60), Offset(62, 60), Offset(76, 66), Offset(80, 92), Offset(42, 66), Offset(36, 50)),
-    _Pose(Offset(18, 58), Offset(27, 60), Offset(62, 60), Offset(76, 66), Offset(80, 92), Offset(36, 44), Offset(36, 28)),
-  ],
-  LiftKind.pull: [
-    _Pose(Offset(26, 40), Offset(34, 43), Offset(64, 48), Offset(68, 72), Offset(66, 97), Offset(36, 60), Offset(36, 78)),
-    _Pose(Offset(26, 40), Offset(34, 43), Offset(64, 48), Offset(68, 72), Offset(66, 97), Offset(52, 46), Offset(42, 62)),
-  ],
-  LiftKind.verticalPull: [
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(58, 12), Offset(54, 1)),
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(64, 38), Offset(58, 24)),
-  ],
-  LiftKind.squat: [
-    _Pose(_standHead, _standNeck, Offset(50, 56), Offset(52, 77), _standFoot, Offset(40, 32), Offset(45, 24)),
-    _Pose(Offset(58, 38), Offset(55, 48), Offset(36, 72), Offset(60, 76), _standFoot, Offset(46, 54), Offset(50, 46)),
-  ],
-  LiftKind.hinge: [
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(52, 44), Offset(54, 62)),
-    _Pose(Offset(76, 46), Offset(68, 50), Offset(44, 54), Offset(48, 76), _standFoot, Offset(66, 66), Offset(64, 84)),
-  ],
-  LiftKind.curl: [
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(54, 44), Offset(56, 62)),
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(54, 44), Offset(60, 28)),
-  ],
-  LiftKind.raise: [
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(54, 44), Offset(56, 60)),
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(68, 30), Offset(84, 28)),
-  ],
-  LiftKind.calf: [
-    _Pose(_standHead, _standNeck, _standHip, _standKnee, _standFoot, Offset(54, 42), Offset(54, 58)),
-    _Pose(Offset(50, 9), Offset(50, 20), Offset(50, 51), Offset(51, 71), Offset(50, 91), Offset(54, 35), Offset(54, 51)),
-  ],
-  LiftKind.plank: [
-    _Pose(Offset(16, 60), Offset(25, 64), Offset(58, 68), Offset(74, 72), Offset(90, 78), Offset(26, 80), Offset(30, 92)),
-    _Pose(Offset(16, 58), Offset(25, 62), Offset(58, 66), Offset(74, 71), Offset(90, 78), Offset(26, 80), Offset(30, 92)),
-  ],
-};
-
-/// A looping stick-figure animation of the exercise being performed.
-class LiftFigure extends StatefulWidget {
-  const LiftFigure({super.key, required this.kind, this.color = Colors.white, this.size = 140});
-  final LiftKind kind;
-  final Color color;
-  final double size;
-
-  @override
-  State<LiftFigure> createState() => _LiftFigureState();
-}
-
-class _LiftFigureState extends State<LiftFigure> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: widget.size,
-      height: widget.size,
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (context, _) => CustomPaint(
-          painter: _LiftPainter(widget.kind, Curves.easeInOut.transform(_c.value), widget.color),
-        ),
-      ),
-    );
-  }
-}
-
-class _LiftPainter extends CustomPainter {
-  _LiftPainter(this.kind, this.t, this.color);
-  final LiftKind kind;
-  final double t;
-  final Color color;
+class _PaperPainter extends CustomPainter {
+  _PaperPainter(this.dark);
+  final bool dark;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final s = size.width / 100;
-    Offset p(Offset o) => Offset(o.dx * s, o.dy * s);
-    final poses = _poses[kind]!;
-    final pose = _Pose.lerp(poses[0], poses[1], t);
-    final limb = Paint()
-      ..color = color
-      ..strokeWidth = 4.2 * s
-      ..strokeCap = StrokeCap.round;
-    final body = Paint()
-      ..color = color
-      ..strokeWidth = 6 * s
-      ..strokeCap = StrokeCap.round;
-    final gear = Paint()
-      ..color = const Color(0xFF1B1F27)
-      ..strokeWidth = 3 * s
-      ..strokeCap = StrokeCap.round;
-
-    // Floor shadow.
-    canvas.drawOval(Rect.fromCenter(center: Offset(50 * s, 98 * s), width: 46 * s, height: 5 * s),
-        Paint()..color = Colors.black.withAlpha(50));
-    if (kind == LiftKind.benchPress) {
-      canvas.drawRRect(
-          RRect.fromRectAndRadius(Rect.fromLTWH(12 * s, 63 * s, 58 * s, 6 * s), Radius.circular(2 * s)),
-          Paint()..color = Colors.black.withAlpha(80));
-      canvas.drawLine(p(const Offset(20, 69)), p(const Offset(20, 97)), gear);
-      canvas.drawLine(p(const Offset(62, 69)), p(const Offset(62, 97)), gear);
+    canvas.drawRect(Offset.zero & size, Paint()..color = dark ? const Color(0xFF121110) : Sumi.paper);
+    final a = <Offset>[];
+    for (double y = 4; y < size.height; y += 9) {
+      for (double x = 3; x < size.width; x += 7) {
+        a.add(Offset(x, y));
+      }
     }
-    // Legs (two, slightly apart).
-    canvas.drawLine(p(pose.hip), p(pose.knee), limb);
-    canvas.drawLine(p(pose.knee), p(pose.foot), limb);
-    canvas.drawLine(p(pose.hip), p(pose.knee.translate(-4, 1)), limb);
-    canvas.drawLine(p(pose.knee.translate(-4, 1)), p(pose.foot.translate(-6, 0)), limb);
-    // Torso and arm.
-    canvas.drawLine(p(pose.hip), p(pose.neck), body);
-    canvas.drawLine(p(pose.neck), p(pose.elbow), limb);
-    canvas.drawLine(p(pose.elbow), p(pose.hand), limb);
-    // Head.
-    canvas.drawCircle(p(pose.head), 7.5 * s, Paint()..color = color);
-    // Weight in hand.
-    if (kind != LiftKind.plank) {
-      final h = p(pose.hand);
-      final barbell = kind == LiftKind.benchPress || kind == LiftKind.squat || kind == LiftKind.hinge;
-      final half = (barbell ? 22 : 7) * s;
-      final horizontal = kind != LiftKind.benchPress;
-      final a = horizontal ? h.translate(-half, 0) : h.translate(0, -half);
-      final b = horizontal ? h.translate(half, 0) : h.translate(0, half);
-      canvas.drawLine(a, b, gear..strokeWidth = 3 * s);
-      final plate = Paint()..color = const Color(0xFF1B1F27);
-      final pw = (barbell ? 4.5 : 4) * s, ph = (barbell ? 15 : 9) * s;
-      for (final e in [a, b]) {
-        canvas.drawRRect(
-            RRect.fromRectAndRadius(
-                Rect.fromCenter(center: e, width: horizontal ? pw : ph, height: horizontal ? ph : pw),
-                Radius.circular(1.5 * s)),
-            plate);
+    canvas.drawPoints(
+      PointMode.points,
+      a,
+      Paint()
+        ..color = dark ? const Color(0x10FFFFFF) : const Color(0x40CFC8BB)
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PaperPainter old) => old.dark != dark;
+}
+
+// ---------- Ensō ----------
+
+double _smooth(double x) {
+  final t = x.clamp(0.0, 1.0);
+  return t * t * (3 - 2 * t);
+}
+
+/// Brush width along the stroke: pressed in at the start, tapering and drying at the end.
+double _brushWidth(double t) {
+  final start = 0.62 + 0.38 * _smooth(t / 0.08);
+  final tail = 1 - 0.5 * math.pow(math.max(0.0, (t - 0.5) / 0.5), 1.2).toDouble();
+  return start * tail;
+}
+
+/// Paints an ensō: a single brushed circle that closes as [value] goes from 0 to 1.
+class EnsoPainter extends CustomPainter {
+  EnsoPainter({
+    required this.value,
+    this.color = Sumi.ink,
+    this.stroke = 12,
+    this.seed = 0,
+    this.ghost = true,
+    this.gapColor = Sumi.paper,
+  });
+  final double value;
+  final Color color;
+  final double stroke;
+  final int seed;
+  final bool ghost;
+  final Color gapColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = math.min(size.width, size.height) / 2 - stroke * 0.75;
+    if (r <= 0) return;
+    if (ghost) {
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = stroke * 0.45
+          ..color = color.withAlpha(20),
+      );
+    }
+    final v = value.clamp(0.0, 1.0).toDouble();
+    if (v <= 0.005) return;
+    final sweep = 2 * math.pi * math.min(v, 0.965);
+    const start = -math.pi / 2 - 0.17;
+    final s = seed.toDouble();
+    double radius(double t) => r * (1 + 0.012 * math.sin(t * 9 + s) + 0.006 * math.sin(t * 23 + s * 2));
+    final n = math.max(16, (sweep * 40).round());
+    final outer = <Offset>[];
+    final inner = <Offset>[];
+    for (var i = 0; i <= n; i++) {
+      final t = i / n;
+      final a = start + sweep * t;
+      final rr = radius(t);
+      final w = _brushWidth(t) * stroke;
+      final dir = Offset(math.cos(a), math.sin(a));
+      outer.add(c + dir * (rr + w / 2));
+      inner.add(c + dir * (rr - w / 2));
+    }
+    final path = Path()..moveTo(outer.first.dx, outer.first.dy);
+    for (final p in outer.skip(1)) {
+      path.lineTo(p.dx, p.dy);
+    }
+    for (final p in inner.reversed) {
+      path.lineTo(p.dx, p.dy);
+    }
+    path.close();
+    final fill = Paint()..color = color;
+    canvas.drawPath(path, fill);
+    canvas.drawCircle(c + Offset(math.cos(start), math.sin(start)) * radius(0), _brushWidth(0) * stroke / 2, fill);
+    // Dry-brush streaks in the tail.
+    if (stroke >= 5) {
+      final streak = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(0.6, stroke * 0.07)
+        ..color = gapColor.withAlpha(150);
+      for (var k = 0; k < 3; k++) {
+        final off = (k - 1) * 0.22;
+        final p2 = Path();
+        var started = false;
+        for (var i = (n * 0.55).round(); i <= n; i++) {
+          final t = i / n;
+          final a = start + sweep * t;
+          final rr = radius(t) + off * _brushWidth(t) * stroke;
+          final p = c + Offset(math.cos(a), math.sin(a)) * rr;
+          if (!started) {
+            p2.moveTo(p.dx, p.dy);
+            started = true;
+          } else {
+            p2.lineTo(p.dx, p.dy);
+          }
+        }
+        canvas.drawPath(p2, streak);
       }
     }
   }
 
   @override
-  bool shouldRepaint(_LiftPainter old) => old.t != t || old.kind != kind || old.color != color;
+  bool shouldRepaint(EnsoPainter old) =>
+      old.value != value || old.color != color || old.stroke != stroke || old.seed != seed || old.ghost != ghost;
 }
 
-// ---------------- Confetti ----------------
-
-class ConfettiController extends ChangeNotifier {
-  int _bursts = 0;
-  int get bursts => _bursts;
-  void burst() {
-    _bursts++;
-    notifyListeners();
-  }
-}
-
-class _Particle {
-  _Particle(math.Random r, Size area)
-      : x = area.width / 2 + (r.nextDouble() - 0.5) * 60,
-        y = area.height * 0.55,
-        vx = (r.nextDouble() - 0.5) * 900,
-        vy = -500 - r.nextDouble() * 700,
-        rot = r.nextDouble() * math.pi,
-        spin = (r.nextDouble() - 0.5) * 12,
-        size = 6 + r.nextDouble() * 6,
-        color = _colors[r.nextInt(_colors.length)];
-  double x, y, vx, vy, rot;
-  final double spin, size;
+/// An animated ensō with content in the middle.
+class Enso extends StatelessWidget {
+  const Enso({
+    super.key,
+    required this.value,
+    this.size = 120,
+    this.stroke = 10,
+    this.color = Sumi.ink,
+    this.seed = 0,
+    this.ghost = true,
+    this.gapColor = Sumi.paper,
+    this.child,
+  });
+  final double value;
+  final double size;
+  final double stroke;
   final Color color;
-  static const _colors = [
-    Color(0xFFF4A259), Color(0xFF6FCF97), Color(0xFF7FB2F0), Color(0xFFB794F6), Color(0xFFF2C94C), Color(0xFFF687B3),
-  ];
-}
-
-/// Full-screen confetti layer that bursts whenever [controller.burst] is called.
-class ConfettiLayer extends StatefulWidget {
-  const ConfettiLayer({super.key, required this.controller});
-  final ConfettiController controller;
-
-  @override
-  State<ConfettiLayer> createState() => _ConfettiLayerState();
-}
-
-class _ConfettiLayerState extends State<ConfettiLayer> with SingleTickerProviderStateMixin {
-  late final AnimationController _anim =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
-  final _rnd = math.Random();
-  List<_Particle> _parts = [];
-  Size _area = Size.zero;
-  double _lastT = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_fire);
-    _anim.addListener(_step);
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_fire);
-    _anim.dispose();
-    super.dispose();
-  }
-
-  void _fire() {
-    if (_area == Size.zero) return;
-    _parts = List.generate(70, (_) => _Particle(_rnd, _area));
-    _lastT = 0;
-    _anim.forward(from: 0);
-  }
-
-  void _step() {
-    final t = _anim.value * 1.6;
-    final dt = (t - _lastT).clamp(0.0, 0.05).toDouble();
-    _lastT = t;
-    for (final p in _parts) {
-      p.vy += 1500 * dt;
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.rot += p.spin * dt;
-    }
-    setState(() {});
-  }
+  final int seed;
+  final bool ghost;
+  final Color gapColor;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: LayoutBuilder(builder: (context, c) {
-        _area = c.biggest;
-        return CustomPaint(
-          size: c.biggest,
-          painter: _ConfettiPainter(_anim.isAnimating ? _parts : const [], 1 - _anim.value),
-        );
-      }),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: value),
+      duration: const Duration(milliseconds: 1100),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, _) => SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(
+          painter: EnsoPainter(value: v, color: color, stroke: stroke, seed: seed, ghost: ghost, gapColor: gapColor),
+          child: Center(child: child),
+        ),
+      ),
     );
   }
 }
 
-class _ConfettiPainter extends CustomPainter {
-  _ConfettiPainter(this.parts, this.fade);
-  final List<_Particle> parts;
-  final double fade;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final p in parts) {
-      canvas.save();
-      canvas.translate(p.x, p.y);
-      canvas.rotate(p.rot);
-      canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6),
-          Paint()..color = p.color.withAlpha((255 * fade.clamp(0.0, 1.0)).round()));
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ConfettiPainter old) => true;
-}
-
-// ---------------- Pulsing ring ----------------
-
-/// A softly pulsing circle, used to highlight the current set.
-class PulseCircle extends StatefulWidget {
-  const PulseCircle({super.key, required this.color, required this.child, this.size = 42});
-  final Color color;
-  final Widget child;
+/// Three ensō nested inside each other, each with its own brush weight.
+class TripleEnso extends StatelessWidget {
+  const TripleEnso({super.key, required this.values, this.size = 260, this.color = Sumi.ink, this.child});
+  final List<double> values;
   final double size;
-
-  @override
-  State<PulseCircle> createState() => _PulseCircleState();
-}
-
-class _PulseCircleState extends State<PulseCircle> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
+  final Color color;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, child) {
-        final v = _c.value;
-        return Container(
-          width: widget.size,
-          height: widget.size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: widget.color, width: 2.5),
-            boxShadow: [
-              BoxShadow(color: widget.color.withAlpha((120 * (1 - v)).round()), blurRadius: 4 + 14 * v, spreadRadius: 6 * v),
-            ],
+    const strokes = [13.0, 9.0, 6.0];
+    final insets = [0.0, size * 0.125, size * 0.225];
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(alignment: Alignment.center, children: [
+        for (var i = 0; i < 3 && i < values.length; i++)
+          Enso(
+            value: values[i],
+            size: size - insets[i] * 2,
+            stroke: strokes[i],
+            color: color,
+            seed: i * 3 + 1,
           ),
-          child: child,
-        );
-      },
-      child: widget.child,
+        if (child != null) child!,
+      ]),
+    );
+  }
+}
+
+// ---------- Brush line ----------
+
+/// A single tapered brush stroke, used as a divider or a legend swatch.
+class BrushLine extends StatelessWidget {
+  const BrushLine({super.key, this.width, this.thickness = 2.4, this.color = Sumi.ink});
+  final double? width;
+  final double thickness;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width ?? double.infinity,
+      height: thickness + 6,
+      child: CustomPaint(painter: _BrushLinePainter(thickness, color)),
+    );
+  }
+}
+
+class _BrushLinePainter extends CustomPainter {
+  _BrushLinePainter(this.thickness, this.color);
+  final double thickness;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final mid = size.height / 2;
+    const n = 40;
+    final top = <Offset>[];
+    final bottom = <Offset>[];
+    for (var i = 0; i <= n; i++) {
+      final t = i / n;
+      final x = 1 + (w - 2) * t;
+      final y = mid + math.sin(t * math.pi * 1.6) * thickness * 0.35;
+      final h = thickness * (0.55 + 0.45 * _smooth(t / 0.1)) * (1 - 0.6 * _smooth((t - 0.6) / 0.4)) / 2;
+      top.add(Offset(x, y - h));
+      bottom.add(Offset(x, y + h));
+    }
+    final p = Path()..moveTo(top.first.dx, top.first.dy);
+    for (final o in top.skip(1)) {
+      p.lineTo(o.dx, o.dy);
+    }
+    for (final o in bottom.reversed) {
+      p.lineTo(o.dx, o.dy);
+    }
+    p.close();
+    canvas.drawPath(p, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_BrushLinePainter old) => old.thickness != thickness || old.color != color;
+}
+
+// ---------- Seal ----------
+
+/// A square ink seal (hanko) used for achievements and records.
+class InkSeal extends StatelessWidget {
+  const InkSeal(this.text, {super.key, this.size = 46, this.faded = false, this.angle = -0.09});
+  final String text;
+  final double size;
+  final bool faded;
+  final double angle;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = faded ? Sumi.ink.withAlpha(45) : Sumi.ink;
+    return Transform.rotate(
+      angle: angle,
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          border: Border.all(color: c, width: size > 50 ? 2.6 : 2.2),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(3),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(text, textAlign: TextAlign.center, style: serif(size * 0.3, color: c, height: 1.0)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------- Containers ----------
+
+/// A quiet sheet of paper with a hairline edge.
+class SumiCard extends StatelessWidget {
+  const SumiCard({super.key, required this.child, this.padding = const EdgeInsets.all(16), this.onTap});
+  final Widget child;
+  final EdgeInsets padding;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Sumi.porcelain.withAlpha(200),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Sumi.rule),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+    );
+  }
+}
+
+/// A row with a label on the left, a value on the right and a hairline underneath.
+class SumiRow extends StatelessWidget {
+  const SumiRow({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+    this.serifTitle = true,
+    this.divider = true,
+  });
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final bool serifTitle;
+  final bool divider;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(border: divider ? const Border(bottom: BorderSide(color: Sumi.rule)) : null),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: serifTitle ? serif(20) : const TextStyle(fontSize: 14.5, color: Sumi.ink)),
+              if (subtitle != null && subtitle!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(subtitle!, style: const TextStyle(fontSize: 11.5, color: Sumi.muted)),
+                ),
+            ]),
+          ),
+          if (trailing != null) trailing!,
+        ]),
+      ),
+    );
+  }
+}
+
+/// Bottom tab bar: text labels with a short brush stroke under the active one.
+class SumiTabBar extends StatelessWidget {
+  const SumiTabBar({super.key, required this.index, required this.onTap, required this.labels});
+  final int index;
+  final ValueChanged<int> onTap;
+  final List<String> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xF2EEEBE5),
+        border: Border(top: BorderSide(color: Sumi.rule)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(children: [
+            for (var i = 0; i < labels.length; i++)
+              Expanded(
+                child: InkWell(
+                  onTap: () => onTap(i),
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Text(
+                      labels[i],
+                      style: TextStyle(
+                        fontSize: 12,
+                        letterSpacing: 0.3,
+                        fontWeight: i == index ? FontWeight.w600 : FontWeight.w400,
+                        color: i == index ? Sumi.ink : Sumi.faint,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: i == index ? 1.0 : 0.0,
+                      child: const BrushLine(width: 22, thickness: 2.6),
+                    ),
+                  ]),
+                ),
+              ),
+          ]),
+        ),
+      ),
     );
   }
 }

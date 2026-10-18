@@ -88,7 +88,7 @@ class _AuthScreenState extends State<AuthScreen> {
             Icon(Icons.fitness_center, size: 52, color: theme.colorScheme.primary),
             const SizedBox(height: 12),
             Text('FitLog', textAlign: TextAlign.center,
-                style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900)),
+                style: theme.textTheme.displaySmall),
             const SizedBox(height: 6),
             Text('Train. Eat. Level up with your friends.', textAlign: TextAlign.center,
                 style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),

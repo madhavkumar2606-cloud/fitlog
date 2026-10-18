@@ -6,6 +6,7 @@ import '../game.dart';
 import '../session.dart';
 import '../social.dart';
 import '../util.dart';
+import '../visuals.dart';
 import '../widgets.dart';
 
 class FriendsScreen extends StatelessWidget {
@@ -273,7 +274,7 @@ class _Podium extends StatelessWidget {
     // Display order: 2nd, 1st, 3rd.
     final order = <int>[if (rows.length > 1) 1, 0, if (rows.length > 2) 2];
     const heights = [120.0, 88.0, 64.0];
-    const medal = [Color(0xFFF2C94C), Color(0xFFC0C7D1), Color(0xFFCD8B5A)];
+    const medal = [Sumi.ink, Sumi.ink2, Color(0xFF827C72)];
     return SizedBox(
       height: 290,
       child: Row(
@@ -283,7 +284,7 @@ class _Podium extends StatelessWidget {
           for (final i in order)
             Expanded(
               child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                if (i == 0) const Icon(Icons.workspace_premium, color: Color(0xFFF2C94C), size: 28),
+                if (i == 0) const Icon(Icons.workspace_premium, color: Sumi.ink, size: 28),
                 Avatar(name: rows[i].profile.displayName, color: rows[i].profile.avatarColor, size: i == 0 ? 56 : 46),
                 const SizedBox(height: 6),
                 Text(
@@ -308,7 +309,7 @@ class _Podium extends StatelessWidget {
                     ),
                     child: Text('${i + 1}',
                         style: const TextStyle(
-                            fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF1B1F27))),
+                            fontSize: 26, fontWeight: FontWeight.w900, color: Sumi.porcelain)),
                   ),
                 ),
               ]),
@@ -629,7 +630,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     child: CircleAvatar(
                       radius: 24,
                       backgroundColor: d.badges.contains(b.id) ? xpColor : theme.colorScheme.surfaceContainerHighest,
-                      child: Icon(b.icon, color: const Color(0xFF1B1F27)),
+                      child: Icon(b.icon, color: Sumi.porcelain),
                     ),
                   ),
                 ),

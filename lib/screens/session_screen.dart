@@ -14,8 +14,6 @@ import '../visuals.dart';
 import '../widgets.dart';
 import 'workout_screen.dart';
 
-const _ink = Color(0xFF1B1F27);
-
 class _SetRow {
   _SetRow({String weight = '', String reps = ''})
       : w = TextEditingController(text: weight),
@@ -61,12 +59,6 @@ class _Block {
   }
 }
 
-List<Color> _gradientFor(String muscle) {
-  final c = muscleColor(muscle);
-  final hsl = HSLColor.fromColor(c);
-  return [c, hsl.withLightness((hsl.lightness - 0.18).clamp(0.0, 1.0)).toColor()];
-}
-
 class ActiveSessionScreen extends StatefulWidget {
   const ActiveSessionScreen({super.key, required this.routine});
   final Routine routine;
@@ -80,7 +72,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
 
   final List<_Block> _blocks = [];
   final _page = PageController();
-  final _confetti = ConfettiController();
   late final DateTime _startedAt;
   Timer? _ticker;
   Timer? _prTimer;
@@ -149,7 +140,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     _ticker?.cancel();
     _prTimer?.cancel();
     _page.dispose();
-    _confetti.dispose();
     for (final b in _blocks) {
       for (final r in b.rows) {
         r.dispose();
@@ -202,7 +192,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       }
       if (e > b.bestE1rm) b.bestE1rm = e;
     }
-    _confetti.burst();
     setState(() {
       row.done = true;
       _restLeft = _restDefault;
@@ -226,9 +215,6 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     HapticFeedback.heavyImpact();
     _prTimer?.cancel();
     setState(() => _prText = text);
-    Future.delayed(const Duration(milliseconds: 250), () {
-      if (mounted) _confetti.burst();
-    });
     _prTimer = Timer(const Duration(milliseconds: 2800), () {
       if (mounted) setState(() => _prText = null);
     });
@@ -270,7 +256,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     final logged = _collect();
     if (logged.isEmpty) {
       final discard = await confirmDialog(
-          context, 'No sets completed', 'Tap "Complete set" after each set you finish. Discard this workout?', 'Discard');
+          context, 'No sets completed', 'Tap "Done" after each set you finish. Discard this workout?', 'Discard');
       if (discard && mounted) Navigator.pop(context, false);
       return;
     }
@@ -317,13 +303,13 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         if (leave && context.mounted) Navigator.of(context).pop(false);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF121820),
+        backgroundColor: Sumi.paper,
         body: Stack(children: [
           const Positioned.fill(child: AppBackground()),
           SafeArea(
             child: Column(children: [
               _topBar(),
-              if (_ready && _blocks.isNotEmpty) _exerciseStrip(),
+              if (_ready && _blocks.length > 1) _exerciseStrip(),
               Expanded(
                 child: !_ready
                     ? const Center(child: CircularProgressIndicator())
@@ -338,61 +324,39 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               ),
             ]),
           ),
-          Positioned.fill(child: ConfettiLayer(controller: _confetti)),
-          if (_prText != null) Positioned(left: 20, right: 20, top: 110, child: _prBadge(_prText!)),
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: 16,
+          Positioned.fill(
             child: IgnorePointer(
               ignoring: _restLeft == 0,
-              child: AnimatedSlide(
-                offset: _restLeft > 0 ? Offset.zero : const Offset(0, 1.6),
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.easeOutCubic,
-                child: _restPanel(),
+              child: AnimatedOpacity(
+                opacity: _restLeft > 0 ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: _restOverlay(),
               ),
             ),
           ),
+          if (_prText != null) Positioned(left: 20, right: 20, top: 90, child: _prBadge(_prText!)),
         ]),
       ),
     );
   }
 
   Widget _topBar() {
-    final theme = Theme.of(context);
-    var total = 0, done = 0;
-    for (final b in _blocks) {
-      total += b.rows.length;
-      done += b.doneCount;
-    }
-    final pct = total == 0 ? 0.0 : done / total;
+    final b = _blocks.isEmpty ? null : _blocks[_index.clamp(0, _blocks.length - 1)];
+    final pos = _blocks.isEmpty ? '' : '${_index + 1} / ${_blocks.length}  ·  ';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
       child: Row(children: [
-        IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: 'Leave workout',
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        AnimatedRing(
-          value: pct,
-          color: pct >= 1 ? goodColor : theme.colorScheme.primary,
-          size: 44,
-          stroke: 5,
-          child: Text('${(pct * 100).round()}', style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w900)),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(widget.routine.name,
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-            Text('${_fmt(_elapsed)}  |  $done/$total sets', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
-          ]),
-        ),
-        IconButton(icon: const Icon(Icons.add), tooltip: 'Add exercise', onPressed: _pickExercise),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: pct >= 1 ? goodColor : null),
+        _squareKey(Icons.close, () => Navigator.maybePop(context), 'Leave workout'),
+        const SizedBox(width: 8),
+        _squareKey(Icons.add, _pickExercise, 'Add exercise'),
+        Expanded(child: Center(child: SumiLabel('$pos${_fmt(_elapsed)}'))),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 38),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            backgroundColor: b != null && _blocks.every((x) => x.complete) ? Sumi.ink : Sumi.porcelain,
+            foregroundColor: b != null && _blocks.every((x) => x.complete) ? Sumi.porcelain : Sumi.ink,
+          ),
           onPressed: _saving ? null : _finish,
           child: const Text('Finish'),
         ),
@@ -400,39 +364,52 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     );
   }
 
+  Widget _squareKey(IconData icon, VoidCallback onTap, String tip) {
+    return Tooltip(
+      message: tip,
+      child: Material(
+        color: Sumi.porcelain,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: const BorderSide(color: Color(0xFFD6D0C4)),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: SizedBox(width: 38, height: 38, child: Icon(icon, size: 18, color: Sumi.ink)),
+        ),
+      ),
+    );
+  }
+
   Widget _exerciseStrip() {
     return SizedBox(
-      height: 46,
+      height: 44,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         itemCount: _blocks.length,
         itemBuilder: (context, i) {
           final b = _blocks[i];
-          final c = muscleColor(b.muscle);
           final active = i == _index;
           final frac = b.rows.isEmpty ? 0.0 : b.doneCount / b.rows.length;
-          return GestureDetector(
+          return InkWell(
             onTap: () => _page.animateToPage(i, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin: const EdgeInsets.only(right: 8, top: 6, bottom: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(17),
-                color: active ? c.withAlpha(60) : Colors.white.withAlpha(14),
-                border: Border.all(color: active ? c : Colors.transparent, width: 1.5),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: b.complete
-                      ? const Icon(Icons.check_circle, size: 18, color: goodColor)
-                      : CircularProgressIndicator(value: frac, strokeWidth: 3, color: c, backgroundColor: c.withAlpha(50)),
-                ),
-                const SizedBox(width: 8),
-                Text(b.name, style: TextStyle(fontWeight: active ? FontWeight.w800 : FontWeight.w500, fontSize: 13)),
+                Enso(value: frac, size: 18, stroke: 2.4, seed: i),
+                const SizedBox(width: 6),
+                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(b.name,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                        color: active ? Sumi.ink : Sumi.faint,
+                      )),
+                  const SizedBox(height: 3),
+                  Opacity(opacity: active ? 1.0 : 0.0, child: const BrushLine(width: 22, thickness: 2.2)),
+                ]),
               ]),
             ),
           );
@@ -442,121 +419,95 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   }
 
   Widget _emptyState() {
-    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          LiftFigure(kind: LiftKind.press, color: theme.colorScheme.primary, size: 160),
-          const SizedBox(height: 16),
-          Text('Quick workout', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+          Enso(value: 0.15, size: 150, stroke: 10, child: Text('Begin', style: serif(28))),
+          const SizedBox(height: 22),
+          Text('Quick workout', style: serif(32)),
           const SizedBox(height: 6),
-          const Text('Add your first exercise to get going.', textAlign: TextAlign.center),
-          const SizedBox(height: 20),
-          GradientButton(label: 'Add exercise', icon: Icons.add, onPressed: _pickExercise),
+          const Text('Add your first exercise to get going.', textAlign: TextAlign.center, style: TextStyle(color: Sumi.muted)),
+          const SizedBox(height: 22),
+          FilledButton(onPressed: _pickExercise, child: const Text('Add exercise')),
         ]),
       ),
     );
   }
 
   Widget _exercisePage(_Block b) {
-    final theme = Theme.of(context);
-    final g = _gradientFor(b.muscle);
-    final c = muscleColor(b.muscle);
     final row = b.rows.isEmpty ? null : b.rows[b.selected.clamp(0, b.rows.length - 1)];
     final setNo = b.selected + 1;
     final prev = b.selected < b.last.length ? b.last[b.selected] : null;
+    final frac = b.rows.isEmpty ? 0.0 : b.doneCount / b.rows.length;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 150),
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 40),
       children: [
-        // Hero
-        Container(
-          padding: const EdgeInsets.fromLTRB(18, 16, 8, 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: LinearGradient(colors: g, begin: Alignment.topLeft, end: Alignment.bottomRight),
-            boxShadow: [BoxShadow(color: g.last.withAlpha(90), blurRadius: 24, offset: const Offset(0, 10))],
-          ),
-          child: Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                  decoration: BoxDecoration(color: Colors.white.withAlpha(80), borderRadius: BorderRadius.circular(10)),
-                  child: Text(b.muscle.toUpperCase(),
-                      style: const TextStyle(color: _ink, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
-                ),
-                const SizedBox(height: 10),
-                Text(b.name, style: const TextStyle(color: _ink, fontSize: 26, fontWeight: FontWeight.w900, height: 1.1)),
-                const SizedBox(height: 6),
-                Text(
-                  b.complete ? 'All ${b.rows.length} sets done!' : 'Set $setNo of ${b.rows.length}  |  ${b.repMin}-${b.repMax} reps',
-                  style: const TextStyle(color: _ink, fontWeight: FontWeight.w600),
-                ),
-              ]),
-            ),
-            Stack(alignment: Alignment.center, children: [
-              Container(
-                width: 132,
-                height: 132,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withAlpha(50)),
-              ),
-              LiftFigure(kind: liftKindFor(b.name, b.muscle), color: _ink, size: 120),
-              if (b.complete)
-                const CircleAvatar(radius: 26, backgroundColor: goodColor, child: Icon(Icons.check, color: _ink, size: 32)),
-            ]),
-          ]),
-        ),
-        if (b.suggestion != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(color: c.withAlpha(30), borderRadius: BorderRadius.circular(14)),
-            child: Row(children: [
-              Icon(Icons.auto_graph, color: c, size: 20),
-              const SizedBox(width: 10),
-              Expanded(child: Text(b.suggestion!.text, style: theme.textTheme.bodySmall)),
-            ]),
-          ),
-        ],
-        const SizedBox(height: 16),
-        // Set bubbles
-        Wrap(spacing: 10, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          for (var i = 0; i < b.rows.length; i++) _setBubble(b, i, c),
-          GestureDetector(
+        Center(child: SumiLabel(b.muscle)),
+        const SizedBox(height: 6),
+        Center(child: Text(b.name, textAlign: TextAlign.center, style: serif(36))),
+        const SizedBox(height: 14),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (var i = 0; i < b.rows.length; i++) _setDot(b, i),
+          const SizedBox(width: 6),
+          InkWell(
             onTap: () => _addSet(b),
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white24, width: 1.5)),
-              child: const Icon(Icons.add, size: 20),
+            borderRadius: BorderRadius.circular(12),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Text('+ set', style: TextStyle(fontSize: 12, color: Sumi.muted)),
             ),
           ),
           if (b.rows.length > 1)
-            TextButton(onPressed: () => _removeSet(b), child: const Text('Remove set')),
+            InkWell(
+              onTap: () => _removeSet(b),
+              borderRadius: BorderRadius.circular(12),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Text('− set', style: TextStyle(fontSize: 12, color: Sumi.muted)),
+              ),
+            ),
         ]),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         if (row != null) ...[
+          Center(
+            child: Enso(
+              value: b.complete ? 1.0 : frac,
+              size: 236,
+              stroke: 12,
+              seed: b.exerciseId,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                GestureDetector(
+                  onTap: () => _typeValue(row, weight: true),
+                  child: Text(row.weight <= 0 ? 'BW' : fmtW(row.weight), style: serif(58, height: 1)),
+                ),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: () => _typeValue(row, weight: false),
+                  child: Text('× ${row.reps}', style: const TextStyle(fontSize: 15, color: Sumi.muted)),
+                ),
+                const SizedBox(height: 8),
+                SumiLabel(b.complete ? 'All ${b.rows.length} sets done' : 'Set $setNo of ${b.rows.length}', size: 8.5),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 18),
           Row(children: [
             Expanded(
               child: _stepper(
-                label: 'WEIGHT',
                 value: row.weight <= 0 ? 'BW' : fmtW(row.weight),
-                unit: row.weight <= 0 ? 'bodyweight' : 'kg',
-                color: c,
+                unit: 'KG',
                 enabled: !row.done,
                 onMinus: () => _nudge(row, weight: -2.5),
                 onPlus: () => _nudge(row, weight: 2.5),
                 onTap: () => _typeValue(row, weight: true),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: _stepper(
-                label: 'REPS',
                 value: '${row.reps}',
-                unit: 'target ${b.repMin}-${b.repMax}',
-                color: c,
+                unit: 'REPS ${b.repMin}-${b.repMax}',
                 enabled: !row.done,
                 onMinus: () => _nudge(row, reps: -1),
                 onPlus: () => _nudge(row, reps: 1),
@@ -564,156 +515,158 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               ),
             ),
           ]),
-          const SizedBox(height: 10),
-          Center(
-            child: Text(
-              prev == null
-                  ? 'First time doing this set. Pick a weight with 1-2 reps in reserve.'
-                  : 'Last time: ${prev.weight > 0 ? '${fmtW(prev.weight)} kg x ' : ''}${prev.reps} reps',
-              style: theme.textTheme.bodySmall,
-            ),
+          const SizedBox(height: 14),
+          Text(
+            b.suggestion?.text ??
+                (prev == null
+                    ? 'First time on this set. Pick a weight with one or two reps in reserve.'
+                    : 'Last time ${prev.weight > 0 ? '${fmtW(prev.weight)} × ' : ''}${prev.reps}.'),
+            textAlign: TextAlign.center,
+            style: serif(16, italic: true, color: Sumi.muted, height: 1.3),
           ),
-          const SizedBox(height: 16),
+          if (b.suggestion != null && prev != null) ...[
+            const SizedBox(height: 4),
+            Text('Last time ${prev.weight > 0 ? '${fmtW(prev.weight)} × ' : ''}${prev.reps}',
+                textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, color: Sumi.muted)),
+          ],
+          const SizedBox(height: 20),
           row.done
-              ? OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              ? OutlinedButton(
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(54)),
                   onPressed: () => _complete(b),
-                  icon: const Icon(Icons.undo),
-                  label: Text('Undo set $setNo'),
+                  child: Text('Undo set $setNo'),
                 )
-              : GradientButton(
-                  label: 'Complete set $setNo',
-                  icon: Icons.check_rounded,
-                  colors: g,
+              : FilledButton(
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
                   onPressed: () => _complete(b),
+                  child: Text('Done · set $setNo', style: const TextStyle(fontSize: 16)),
                 ),
         ],
         if (b.doneCount > 0) ...[
-          const SizedBox(height: 20),
-          Text('Done', style: theme.textTheme.labelLarge),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            for (var i = 0; i < b.rows.length; i++)
-              if (b.rows[i].done)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(color: c.withAlpha(35), borderRadius: BorderRadius.circular(12)),
-                  child: Text(
-                    'Set ${i + 1}: ${b.rows[i].weight > 0 ? '${fmtW(b.rows[i].weight)} x ' : ''}${b.rows[i].reps}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+          const SizedBox(height: 22),
+          Container(
+            decoration: const BoxDecoration(border: Border(top: BorderSide(color: Sumi.rule))),
+            child: Column(children: [
+              for (var i = 0; i < b.rows.length; i++)
+                if (b.rows[i].done)
+                  InkWell(
+                    onTap: () => setState(() => b.selected = i),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Sumi.rule))),
+                      child: Row(children: [
+                        SumiLabel('Set ${i + 1}'),
+                        const Spacer(),
+                        Text('${b.rows[i].weight > 0 ? '${fmtW(b.rows[i].weight)} × ' : ''}${b.rows[i].reps}',
+                            style: serif(19)),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.check, size: 16, color: Sumi.ink),
+                      ]),
+                    ),
                   ),
-                ),
-          ]),
+            ]),
+          ),
         ],
       ],
     );
   }
 
-  Widget _setBubble(_Block b, int i, Color c) {
+  Widget _setDot(_Block b, int i) {
     final row = b.rows[i];
     final selected = i == b.selected;
-    Widget inner = Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.w800));
-    if (row.done) {
-      return GestureDetector(
-        onTap: () => setState(() => b.selected = i),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: c,
-            border: Border.all(color: selected ? Colors.white : Colors.transparent, width: 2),
-          ),
-          child: const Icon(Icons.check, color: _ink, size: 22),
-        ),
-      );
-    }
-    if (selected) {
-      return PulseCircle(color: c, child: inner);
-    }
+    final size = selected ? 14.0 : 10.0;
     return GestureDetector(
       onTap: () => setState(() => b.selected = i),
-      child: Container(
-        width: 42,
-        height: 42,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: c.withAlpha(110), width: 1.5)),
-        child: inner,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: row.done ? Sumi.ink : Colors.transparent,
+            border: Border.all(color: row.done || selected ? Sumi.ink : Sumi.faint, width: selected ? 1.8 : 1.2),
+          ),
+        ),
       ),
     );
   }
 
   Widget _stepper({
-    required String label,
     required String value,
     required String unit,
-    required Color color,
     required bool enabled,
     required VoidCallback onMinus,
     required VoidCallback onPlus,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
-    Widget btn(IconData icon, VoidCallback f) => Material(
-          color: enabled ? color.withAlpha(45) : Colors.white10,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: enabled ? f : null,
-            child: SizedBox(width: 42, height: 42, child: Icon(icon, color: enabled ? color : Colors.white38)),
+    Widget seg(String t, VoidCallback f) => InkWell(
+          onTap: enabled ? f : null,
+          child: SizedBox(
+            width: 44,
+            height: 56,
+            child: Center(
+              child: Text(t, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w300, color: enabled ? Sumi.ink : Sumi.faint)),
+            ),
           ),
         );
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+      height: 56,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        color: Colors.white.withAlpha(12),
-        border: Border.all(color: Colors.white.withAlpha(20)),
+        color: Sumi.porcelain,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD6D0C4)),
+        boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 2, offset: Offset(0, 1))],
       ),
-      child: Column(children: [
-        Text(label, style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 4),
-        GestureDetector(
-          onTap: onTap,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 160),
-            transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
-            child: Text(value,
-                key: ValueKey(value),
-                style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: enabled ? Colors.white : Colors.white54)),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Row(children: [
+          seg('−', onMinus),
+          Expanded(
+            child: InkWell(
+              onTap: enabled ? onTap : null,
+              child: Container(
+                decoration: const BoxDecoration(
+                  border: Border(left: BorderSide(color: Color(0xFFE1DCD2)), right: BorderSide(color: Color(0xFFE1DCD2))),
+                ),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(value, style: serif(22, color: enabled ? Sumi.ink : Sumi.faint, height: 1)),
+                  const SizedBox(height: 2),
+                  FittedBox(child: SumiLabel(unit, size: 8)),
+                ]),
+              ),
+            ),
           ),
-        ),
-        Text(unit, style: theme.textTheme.labelSmall),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-          btn(Icons.remove, onMinus),
-          btn(Icons.add, onPlus),
+          seg('+', onPlus),
         ]),
-      ]),
+      ),
     );
   }
 
   Widget _prBadge(String text) {
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.4, end: 1),
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.elasticOut,
+      tween: Tween(begin: 0.85, end: 1),
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutBack,
       builder: (context, s, child) => Transform.scale(scale: s, child: child),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: const LinearGradient(colors: [Color(0xFFF2C94C), Color(0xFFF4A259)]),
-          boxShadow: const [BoxShadow(color: Color(0x88F2C94C), blurRadius: 30)],
+          color: Sumi.sheet,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Sumi.ink),
+          boxShadow: const [BoxShadow(color: Color(0x22000000), blurRadius: 18, offset: Offset(0, 8))],
         ),
         child: Row(children: [
-          const Text('🏆', style: TextStyle(fontSize: 34)),
-          const SizedBox(width: 12),
+          const InkSeal('PR', size: 44),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              const Text('NEW PERSONAL RECORD!', style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 16)),
-              Text(text, style: const TextStyle(color: _ink, fontWeight: FontWeight.w600)),
+              Text('New personal record', style: serif(20)),
+              const SizedBox(height: 2),
+              Text(text, style: const TextStyle(fontSize: 12.5, color: Sumi.ink2)),
             ]),
           ),
         ]),
@@ -721,230 +674,205 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     );
   }
 
-  Widget _restPanel() {
-    final theme = Theme.of(context);
+  Widget _restOverlay() {
     String next = '';
     if (_blocks.isNotEmpty) {
       final b = _blocks[_index.clamp(0, _blocks.length - 1)];
       final n = b.nextUndone;
       if (n != null) {
         final r = b.rows[n];
-        next = 'Next: set ${n + 1}, ${r.weight > 0 ? '${fmtW(r.weight)} kg x ' : ''}${r.reps}';
+        next = 'Next: set ${n + 1}, ${r.weight > 0 ? '${fmtW(r.weight)} kg × ' : ''}${r.reps}';
       } else if (_index < _blocks.length - 1) {
         next = 'Next: ${_blocks[_index + 1].name}';
       } else {
-        next = 'Last set done. Tap Finish!';
+        next = 'Last set done. Tap Finish when you are ready.';
       }
     }
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(26),
-        color: const Color(0xFF243447),
-        border: Border.all(color: Colors.white.withAlpha(25)),
-        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 24, offset: Offset(0, 8))],
-      ),
-      child: Row(children: [
-        AnimatedRing(
-          value: _restTotal <= 0 ? 0 : _restLeft / _restTotal,
-          color: infoColor,
-          size: 76,
-          stroke: 7,
-          child: Text(_fmt(Duration(seconds: _restLeft)),
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Rest & breathe', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text(next, style: theme.textTheme.bodySmall, maxLines: 2),
+    return Stack(children: [
+      const Positioned.fill(child: AppBackground()),
+      SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+          child: Column(children: [
+            Row(children: [const SumiLabel('Rest'), const Spacer(), SumiLabel(_fmt(_elapsed))]),
+            const Spacer(),
+            Enso(
+              value: _restTotal <= 0 ? 0.0 : 1 - _restLeft / _restTotal,
+              size: 236,
+              stroke: 12,
+              seed: 7,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(_fmt(Duration(seconds: _restLeft)), style: serif(58, height: 1)),
+                const SizedBox(height: 6),
+                SumiLabel('of ${_fmt(Duration(seconds: _restTotal))}', size: 8.5),
+              ]),
+            ),
+            const SizedBox(height: 18),
+            Text('Breathe in. Breathe out.', style: serif(18, italic: true, color: Sumi.muted)),
             const SizedBox(height: 8),
+            Text(next, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5, color: Sumi.ink2)),
+            const Spacer(),
             Row(children: [
-              _restChip('-15s', () => setState(() => _restLeft = math.max(0, _restLeft - 15))),
-              _restChip('+15s', () => setState(() {
+              SizedBox(
+                width: 84,
+                child: OutlinedButton(
+                  onPressed: () => setState(() => _restLeft = math.max(0, _restLeft - 15)),
+                  child: const Text('−15 s'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => setState(() => _restLeft = 0),
+                  child: const Text('Skip rest'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 84,
+                child: OutlinedButton(
+                  onPressed: () => setState(() {
                     _restLeft += 15;
                     if (_restLeft > _restTotal) _restTotal = _restLeft;
-                  })),
-              _restChip('Skip', () => setState(() => _restLeft = 0)),
+                  }),
+                  child: const Text('+15 s'),
+                ),
+              ),
             ]),
           ]),
         ),
-      ]),
-    );
+      ),
+    ]);
   }
-
-  Widget _restChip(String label, VoidCallback onTap) => Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: Material(
-          color: Colors.white.withAlpha(20),
-          borderRadius: BorderRadius.circular(14),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-            ),
-          ),
-        ),
-      );
 }
 
-/// Shown after finishing a workout: XP earned, records, level and badges, with confetti.
-class SessionSummaryScreen extends StatefulWidget {
+/// Shown after finishing a workout: XP earned, records, level and seals.
+class SessionSummaryScreen extends StatelessWidget {
   const SessionSummaryScreen({super.key, required this.summary, required this.reward});
   final SessionSummary summary;
   final SessionReward reward;
 
   @override
-  State<SessionSummaryScreen> createState() => _SessionSummaryScreenState();
-}
-
-class _SessionSummaryScreenState extends State<SessionSummaryScreen> {
-  final _confetti = ConfettiController();
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _confetti.burst();
-      HapticFeedback.mediumImpact();
-    });
-  }
-
-  @override
-  void dispose() {
-    _confetti.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final summary = widget.summary;
-    final reward = widget.reward;
     final g = reward.state;
     return Scaffold(
-      backgroundColor: const Color(0xFF121820),
+      backgroundColor: Sumi.paper,
       body: Stack(children: [
         const Positioned.fill(child: AppBackground()),
         SafeArea(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 32),
             children: [
+              Row(children: [
+                SumiLabel('${summary.routineName} · complete'),
+                const Spacer(),
+                SumiLabel(prettyDay(summary.date)),
+              ]),
+              const SizedBox(height: 26),
               Center(
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0.3, end: 1),
-                  duration: const Duration(milliseconds: 900),
-                  curve: Curves.elasticOut,
-                  builder: (context, s, child) => Transform.scale(scale: s, child: child),
-                  child: Container(
-                    width: 110,
-                    height: 110,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(colors: [Color(0xFFF2C94C), Color(0xFFF4A259)]),
-                      boxShadow: const [BoxShadow(color: Color(0x88F4A259), blurRadius: 40)],
-                    ),
-                    child: const Text('💪', style: TextStyle(fontSize: 56)),
-                  ),
+                child: Enso(
+                  value: 0.97,
+                  size: 230,
+                  stroke: 13,
+                  seed: summary.id,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(fmtInt(summary.volume), style: serif(44, height: 1)),
+                    const SizedBox(height: 4),
+                    const SumiLabel('kg lifted', size: 8.5),
+                  ]),
                 ),
               ),
-              const SizedBox(height: 16),
-              Center(child: Text('${summary.routineName} complete!',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900))),
-              const SizedBox(height: 6),
+              const SizedBox(height: 18),
+              Center(child: Text('Well done.', style: serif(40))),
+              const SizedBox(height: 4),
               Center(
                 child: TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0, end: reward.xp.toDouble()),
-                  duration: const Duration(milliseconds: 1400),
+                  duration: const Duration(milliseconds: 1200),
                   curve: Curves.easeOutCubic,
-                  builder: (context, v, _) => Text(
-                    '+${v.round()} XP',
-                    style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w900, color: xpColor),
-                  ),
+                  builder: (context, v, _) => Text('+${v.round()} xp',
+                      style: const TextStyle(fontSize: 14, color: Sumi.muted, letterSpacing: 0.6)),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 22),
+              Container(
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: Sumi.edge), bottom: BorderSide(color: Sumi.edge)),
+                ),
+                child: Row(children: [
+                  _stat('Sets', '${summary.sets}'),
+                  Container(width: 1, height: 54, color: Sumi.edge),
+                  _stat('Minutes', '${summary.durationMin}'),
+                  Container(width: 1, height: 54, color: Sumi.edge),
+                  _stat('Kcal', '${summary.kcalBurned.round()}'),
+                ]),
+              ),
+              const SizedBox(height: 22),
               if (reward.leveledUp)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: const LinearGradient(colors: [Color(0xFFB794F6), Color(0xFF805AD5)]),
-                  ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
                   child: Row(children: [
-                    const Icon(Icons.keyboard_double_arrow_up, color: _ink, size: 36),
-                    const SizedBox(width: 12),
+                    InkSeal('LV\n${g.level}', size: 52),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Level up! Level ${g.level}',
-                            style: const TextStyle(color: _ink, fontSize: 18, fontWeight: FontWeight.w900)),
-                        Text('New title: ${g.title}', style: const TextStyle(color: _ink)),
+                        Text('Level ${g.level}', style: serif(24)),
+                        Text('New title: ${g.title}', style: const TextStyle(fontSize: 13, color: Sumi.ink2)),
                       ]),
                     ),
                   ]),
                 ),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Text('Level ${g.level}', style: theme.textTheme.titleMedium),
-                      const SizedBox(width: 8),
-                      Text(g.title, style: theme.textTheme.bodyMedium?.copyWith(color: xpColor)),
-                      const Spacer(),
-                      Text('${g.xpToNext} XP to go', style: theme.textTheme.bodySmall),
-                    ]),
-                    const SizedBox(height: 10),
-                    AnimatedBar(value: g.levelProgress, color: xpColor, height: 12),
-                  ]),
-                ),
-              ),
-              const SizedBox(height: 4),
               Row(children: [
-                Expanded(child: StatTile(value: '${summary.sets}', label: 'sets', icon: Icons.format_list_numbered)),
-                const SizedBox(width: 8),
-                Expanded(child: StatTile(value: fmtInt(summary.volume), label: 'kg lifted', icon: Icons.fitness_center)),
-                const SizedBox(width: 8),
-                Expanded(child: StatTile(value: '${summary.durationMin}', label: 'minutes', icon: Icons.timer_outlined)),
+                Text('Level ${g.level} · ${g.title}', style: serif(20)),
+                const Spacer(),
+                Text('${g.xpToNext} xp to go', style: const TextStyle(fontSize: 11.5, color: Sumi.muted)),
               ]),
+              const SizedBox(height: 10),
+              AnimatedBar(value: g.levelProgress, color: Sumi.ink, height: 4),
               if (reward.prs.isNotEmpty) ...[
-                const SectionHeader(title: 'New personal records'),
+                const SectionHeader(title: 'New records'),
                 for (final name in reward.prs)
-                  Card(
-                    child: ListTile(
-                      leading: const Text('🏆', style: TextStyle(fontSize: 28)),
-                      title: Text(name),
-                      subtitle: const Text('Best estimated max ever'),
-                      trailing: const XpPill(XpRules.pr, done: true),
-                    ),
+                  SumiRow(
+                    title: name,
+                    subtitle: 'Best estimated max ever',
+                    trailing: const InkSeal('PR', size: 36),
                   ),
               ],
               if (g.newBadges.isNotEmpty) ...[
-                const SectionHeader(title: 'Badges unlocked'),
+                const SectionHeader(title: 'Seals earned'),
                 for (final b in g.newBadges)
-                  Card(
-                    child: ListTile(
-                      leading: CircleAvatar(backgroundColor: xpColor, child: Icon(b.icon, color: _ink)),
-                      title: Text(b.name),
-                      subtitle: Text(b.description),
-                    ),
+                  SumiRow(
+                    title: b.name,
+                    subtitle: b.description,
+                    trailing: InkSeal(b.name.split(' ').take(2).join('\n'), size: 40),
                   ),
               ],
-              const SizedBox(height: 8),
-              Text('About ${summary.kcalBurned.round()} kcal burned. Your calorie target already accounts for training days.',
-                  style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
-              const SizedBox(height: 24),
-              GradientButton(label: 'Done', icon: Icons.check_rounded, onPressed: () => Navigator.pop(context)),
+              const SizedBox(height: 18),
+              Text('Your calorie target already accounts for training days.',
+                  textAlign: TextAlign.center, style: serif(15, italic: true, color: Sumi.muted)),
+              const SizedBox(height: 22),
+              FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Done', style: TextStyle(fontSize: 16)),
+              ),
             ],
           ),
         ),
-        Positioned.fill(child: ConfettiLayer(controller: _confetti)),
       ]),
+    );
+  }
+
+  Widget _stat(String label, String value) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(children: [
+          SumiLabel(label, size: 9),
+          const SizedBox(height: 2),
+          Text(value, style: serif(26)),
+        ]),
+      ),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../calc.dart';
@@ -9,6 +11,7 @@ import '../report.dart';
 import '../session.dart';
 import '../social.dart';
 import '../util.dart';
+import '../visuals.dart';
 import '../widgets.dart';
 import 'game_screen.dart';
 import 'me_screen.dart';
@@ -32,6 +35,7 @@ class _TodayScreenState extends State<TodayScreen> {
   Set<String> _trainedDays = {};
   bool _showEaten = false;
   int _gameBest = 0;
+  int _weekTarget = 3;
 
   @override
   void initState() {
@@ -52,9 +56,11 @@ class _TodayScreenState extends State<TodayScreen> {
     final weekXp = await db.xpByDay(ws);
     final trained = (await db.sessionDatesSince(ws)).toSet();
     final gameBest = int.tryParse(await db.getMeta('game_best') ?? '') ?? 0;
+    final per4w = await db.sessionCountSince(daysAgoKey(28));
     if (!mounted) return;
     setState(() {
       _gameBest = gameBest;
+      _weekTarget = math.max(3, math.min(6, (per4w / 4).round()));
       _plan = plan;
       _game = game;
       _report = report;
@@ -146,22 +152,25 @@ class _TodayScreenState extends State<TodayScreen> {
             : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  padding: const EdgeInsets.fromLTRB(22, 14, 22, 32),
                   children: [
                     _header(plan, game),
-                    const SizedBox(height: 14),
-                    _levelCard(game),
-                    const SizedBox(height: 10),
-                    _calorieCard(plan),
-                    const SizedBox(height: 10),
-                    _weekStrip(),
-                    const SizedBox(height: 10),
-                    _questsCard(game),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 22),
+                    _rings(plan),
+                    const SizedBox(height: 18),
+                    _legend(plan),
+                    _planNote(plan),
+                    const SizedBox(height: 18),
                     _actions(),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 28),
+                    _weekStrip(),
+                    const SizedBox(height: 28),
+                    _questsCard(game),
+                    const SizedBox(height: 24),
+                    _levelCard(game),
+                    const SizedBox(height: 24),
                     GymDashCard(best: _gameBest, onPlayed: _load),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 16),
                     if (_report != null) _reportTeaser(_report!),
                   ],
                 ),
@@ -171,311 +180,211 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   Widget _header(PlanSnapshot plan, GameState game) {
-    final theme = Theme.of(context);
     final me = AppSession.instance.me;
     final name = plan.profile.name.isNotEmpty ? plan.profile.name : (me?.displayName ?? '');
-    return Row(children: [
+    final now = DateTime.now();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(greeting(), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          SumiLabel('${weekdayShort[now.weekday - 1]} · ${now.day} ${months[now.month - 1]}'),
+          const SizedBox(height: 10),
           Text(
-            firstName(name).isEmpty ? 'Ready to train?' : firstName(name),
-            style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+            firstName(name).isEmpty ? 'Ready to train?' : '${greeting()},\n${firstName(name)}',
+            style: serif(34),
           ),
         ]),
       ),
-      if (game.streak > 0)
-        Tooltip(
-          message: '${game.streak}-day streak',
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(color: fireColor.withAlpha(40), borderRadius: BorderRadius.circular(20)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.local_fire_department, color: fireColor, size: 20),
-              const SizedBox(width: 4),
-              Text('${game.streak}', style: const TextStyle(color: fireColor, fontWeight: FontWeight.w800)),
-            ]),
-          ),
+      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        GestureDetector(
+          onTap: _openMe,
+          child: Avatar(name: name.isEmpty ? '?' : name, color: me?.avatarColor ?? 0, size: 40, level: game.level),
         ),
-      GestureDetector(
-        onTap: _openMe,
-        child: Avatar(name: name.isEmpty ? '?' : name, color: me?.avatarColor ?? 0, size: 46, level: game.level),
-      ),
+        if (game.streak > 0) ...[
+          const SizedBox(height: 10),
+          Text('${game.streak} day streak', style: const TextStyle(fontSize: 11, color: Sumi.muted)),
+        ],
+      ]),
     ]);
   }
 
-  Widget _levelCard(GameState g) {
-    const ink = Color(0xFF1B1F27);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(26),
-        onTap: _openMe,
-        child: Ink(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
-            gradient: const LinearGradient(
-              colors: [Color(0xFFB794F6), Color(0xFF7F5AD5)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: const [BoxShadow(color: Color(0x557F5AD5), blurRadius: 22, offset: Offset(0, 8))],
+  double _ratio(double v, double t) => t <= 0 ? 0.0 : (v / t).clamp(0.0, 1.0).toDouble();
+
+  Widget _rings(PlanSnapshot plan) {
+    final t = plan.target;
+    final remaining = t.kcal - _eaten.kcal;
+    final over = remaining < 0;
+    final big = _showEaten ? fmtInt(_eaten.kcal) : fmtInt(remaining.abs());
+    final small = _showEaten ? 'KCAL EATEN' : (over ? 'KCAL OVER' : 'KCAL LEFT');
+    return Center(
+      child: GestureDetector(
+        onTap: () => setState(() => _showEaten = !_showEaten),
+        child: TripleEnso(
+          size: 264,
+          values: [
+            _ratio(_eaten.kcal, t.kcal),
+            _ratio(_eaten.protein, t.protein),
+            _ratio(_trainedDays.length.toDouble(), _weekTarget.toDouble()),
+          ],
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Column(key: ValueKey(_showEaten), mainAxisSize: MainAxisSize.min, children: [
+              Text(big, style: serif(34, color: over && !_showEaten ? Sumi.error : Sumi.ink)),
+              const SizedBox(height: 4),
+              SumiLabel(small, size: 8.5),
+            ]),
           ),
-          child: Row(children: [
-            Container(
-              width: 62,
-              height: 62,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withAlpha(70),
-                border: Border.all(color: Colors.white.withAlpha(140), width: 2),
-              ),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Text('LVL', style: TextStyle(color: ink, fontSize: 10, fontWeight: FontWeight.w800)),
-                Text('${g.level}', style: const TextStyle(color: ink, fontSize: 24, fontWeight: FontWeight.w900, height: 1)),
-              ]),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Expanded(
-                    child: Text(g.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: ink, fontSize: 18, fontWeight: FontWeight.w900)),
-                  ),
-                  if (g.todayXp > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: Colors.white.withAlpha(90), borderRadius: BorderRadius.circular(10)),
-                      child: Text('+${g.todayXp} today', style: const TextStyle(color: ink, fontSize: 12, fontWeight: FontWeight.w800)),
-                    ),
-                ]),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: AnimatedBar(value: g.levelProgress, color: Colors.white, height: 10),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${fmtInt(g.xpToNext)} XP to level ${g.level + 1}  |  ${fmtInt(g.weekXp)} XP this week',
-                  style: const TextStyle(color: ink, fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ]),
-            ),
-          ]),
         ),
       ),
     );
   }
 
-  Widget _calorieCard(PlanSnapshot plan) {
-    final t = plan.target;
-    final theme = Theme.of(context);
-    final remaining = t.kcal - _eaten.kcal;
-    final over = remaining < 0;
-    final pct = t.kcal <= 0 ? 0.0 : _eaten.kcal / t.kcal;
-    final big = _showEaten ? fmtInt(_eaten.kcal) : fmtInt(remaining.abs());
-    final small = _showEaten ? 'kcal eaten' : (over ? 'kcal over' : 'kcal left');
-    final restDelta = (t.baseKcal - plan.restTarget.kcal).round();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-        child: Column(children: [
-          Row(children: [
-            GestureDetector(
-              onTap: () => setState(() => _showEaten = !_showEaten),
-              child: AnimatedRing(
-                value: pct,
-                color: over ? theme.colorScheme.error : theme.colorScheme.primary,
-                size: 150,
-                stroke: 14,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: Column(
-                    key: ValueKey(_showEaten),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(big,
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: over && !_showEaten ? theme.colorScheme.error : null,
-                          )),
-                      Text(small, style: theme.textTheme.bodySmall),
-                      const SizedBox(height: 2),
-                      Icon(Icons.touch_app_outlined, size: 14, color: theme.colorScheme.onSurfaceVariant),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Target ${fmtInt(t.kcal)} kcal', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  plan.trainingDay && t.cycling
-                      ? 'Training day: +${trainingDayBonus.round()} kcal to fuel your session.'
-                      : t.cycling
-                          ? 'Rest day: $restDelta kcal lower so your week stays on plan.'
-                          : 'Eat about this much to reach your goal.',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ]),
-            ),
-          ]),
-          const SizedBox(height: 16),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-            MacroRing(label: 'Protein', value: _eaten.protein, target: t.protein, color: proteinColor),
-            MacroRing(label: 'Carbs', value: _eaten.carbs, target: t.carbs, color: carbsColor),
-            MacroRing(label: 'Fat', value: _eaten.fat, target: t.fat, color: fatColor),
-          ]),
-          if (!plan.trained)
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: plan.planned,
-              onChanged: _setPlanned,
-              title: const Text('Training today?'),
-              subtitle: const Text('Adds training-day calories and a workout quest'),
-            )
-          else
-            const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.check_circle, color: goodColor),
-              title: Text('Workout done today'),
-            ),
-        ]),
-      ),
+  Widget _legendRow(double thick, String name, String value, String of) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Sumi.rule))),
+      child: Row(children: [
+        BrushLine(width: 24, thickness: thick),
+        const SizedBox(width: 12),
+        Expanded(child: SumiLabel(name, size: 11)),
+        Text(value, style: serif(22)),
+        SizedBox(
+          width: 74,
+          child: Text(of, textAlign: TextAlign.right, style: const TextStyle(fontSize: 11.5, color: Sumi.muted)),
+        ),
+      ]),
     );
+  }
+
+  Widget _legend(PlanSnapshot plan) {
+    final t = plan.target;
+    return Container(
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: Sumi.rule))),
+      child: Column(children: [
+        _legendRow(5, 'Eat', fmtInt(_eaten.kcal), 'of ${fmtInt(t.kcal)}'),
+        _legendRow(3.6, 'Protein', '${_eaten.protein.round()} g', 'of ${t.protein.round()} g'),
+        _legendRow(2.4, 'Train', '${_trainedDays.length}', 'of $_weekTarget days'),
+      ]),
+    );
+  }
+
+  Widget _planNote(PlanSnapshot plan) {
+    final t = plan.target;
+    final restDelta = (t.baseKcal - plan.restTarget.kcal).round();
+    final note = plan.trainingDay && t.cycling
+        ? 'Training day: +${trainingDayBonus.round()} kcal to fuel your session.'
+        : t.cycling
+            ? 'Rest day: $restDelta kcal lower so your week stays on plan.'
+            : 'Eat about ${fmtInt(t.kcal)} kcal today to reach your goal.';
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const SizedBox(height: 12),
+      Text(note, style: serif(16, italic: true, color: Sumi.muted, height: 1.3)),
+      const SizedBox(height: 6),
+      if (!plan.trained)
+        Row(children: [
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Training today?', style: TextStyle(fontSize: 14.5)),
+              Text('Adds training-day calories and a workout quest',
+                  style: TextStyle(fontSize: 11.5, color: Sumi.muted)),
+            ]),
+          ),
+          Switch(value: plan.planned, onChanged: _setPlanned),
+        ])
+      else
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Text('Workout done today.', style: TextStyle(fontSize: 14.5)),
+        ),
+    ]);
   }
 
   Widget _weekStrip() {
-    final theme = Theme.of(context);
     final ws = weekStart(DateTime.now());
     final today = todayKey();
     final maxXp = _weekXp.values.fold<int>(1, (a, b) => b > a ? b : a);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 10),
-            child: Text('This week', style: theme.textTheme.titleMedium),
-          ),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            for (var i = 0; i < 7; i++)
-              Builder(builder: (context) {
-                final key = dayKey(DateTime(ws.year, ws.month, ws.day + i));
-                final future = key.compareTo(today) > 0;
-                final xp = _weekXp[key] ?? 0;
-                final fill = xp == 0 ? 0.0 : 0.35 + 0.65 * (xp / maxXp);
-                return GestureDetector(
-                  onTap: future ? null : () => _showDay(key),
-                  child: Column(children: [
-                    Text(weekdayShort[i].substring(0, 1), style: theme.textTheme.labelSmall),
-                    const SizedBox(height: 6),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 400),
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: xp > 0
-                            ? theme.colorScheme.primary.withAlpha((fill * 255).round())
-                            : theme.colorScheme.surfaceContainerHighest.withAlpha(future ? 80 : 255),
-                        border: key == today ? Border.all(color: theme.colorScheme.onSurface, width: 2) : null,
-                      ),
-                      child: _trainedDays.contains(key)
-                          ? Icon(Icons.fitness_center, size: 16, color: theme.colorScheme.onPrimary)
-                          : Text(
-                              '${DateTime(ws.year, ws.month, ws.day + i).day}',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: xp > 0 ? theme.colorScheme.onPrimary : null,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(xp > 0 ? '$xp' : '', style: theme.textTheme.labelSmall?.copyWith(color: xpColor)),
-                  ]),
-                );
-              }),
-          ]),
-        ]),
-      ),
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text('This week', style: serif(26)),
+        const Spacer(),
+        Text('tap a day', style: const TextStyle(fontSize: 11, color: Sumi.muted)),
+      ]),
+      const SizedBox(height: 14),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        for (var i = 0; i < 7; i++)
+          Builder(builder: (context) {
+            final day = DateTime(ws.year, ws.month, ws.day + i);
+            final key = dayKey(day);
+            final future = key.compareTo(today) > 0;
+            final xp = _weekXp[key] ?? 0;
+            final fill = xp == 0 ? 0.0 : 0.35 + 0.65 * (xp / maxXp);
+            final trained = _trainedDays.contains(key);
+            return GestureDetector(
+              onTap: future ? null : () => _showDay(key),
+              child: Column(children: [
+                SumiLabel(weekdayShort[i].substring(0, 1), color: key == today ? Sumi.ink : Sumi.muted),
+                const SizedBox(height: 8),
+                Enso(
+                  value: trained ? 1.0 : fill,
+                  size: 36,
+                  stroke: trained ? 4.5 : 3.0,
+                  seed: i,
+                  child: Text('${day.day}',
+                      style: TextStyle(fontSize: 11, color: future ? Sumi.faint : Sumi.ink, fontWeight: FontWeight.w500)),
+                ),
+                const SizedBox(height: 4),
+                Text(xp > 0 ? '$xp' : '', style: const TextStyle(fontSize: 9.5, color: Sumi.muted)),
+              ]),
+            );
+          }),
+      ]),
+    ]);
   }
 
   Widget _questsCard(GameState g) {
-    final theme = Theme.of(context);
     final done = g.quests.where((q) => q.done).length;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Text('Daily quests', style: theme.textTheme.titleMedium),
-            const Spacer(),
-            Text('$done / ${g.quests.length} done', style: theme.textTheme.bodySmall),
-          ]),
-          const SizedBox(height: 8),
-          for (final q in g.quests) _questRow(q),
-          const SizedBox(height: 4),
-          Row(children: [
-            Icon(g.allQuestsDone ? Icons.celebration : Icons.card_giftcard, size: 18, color: xpColor),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                g.allQuestsDone
-                    ? 'All done! Bonus earned.'
-                    : 'Finish all quests for a bonus.',
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-            XpPill(XpRules.allQuestsBonus, done: g.allQuestsDone),
-          ]),
-        ]),
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Text('Daily practice', style: serif(26)),
+        const Spacer(),
+        Text('$done of ${g.quests.length}', style: const TextStyle(fontSize: 11.5, color: Sumi.muted)),
+      ]),
+      const SizedBox(height: 4),
+      Container(
+        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Sumi.rule))),
+        child: Column(children: [for (final q in g.quests) _questRow(q)]),
       ),
-    );
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(
+          child: Text(
+            g.allQuestsDone ? 'All done. Bonus earned.' : 'Finish all three for a bonus.',
+            style: serif(16, italic: true, color: Sumi.muted),
+          ),
+        ),
+        XpPill(XpRules.allQuestsBonus, done: g.allQuestsDone),
+      ]),
+    ]);
   }
 
   Widget _questRow(QuestStatus q) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Sumi.rule))),
       child: Row(children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: q.done ? goodColor : theme.colorScheme.surfaceContainerHighest,
-          ),
-          child: Icon(q.done ? Icons.check : q.def.icon,
-              size: 20, color: q.done ? const Color(0xFF1B1F27) : theme.colorScheme.onSurface),
+        Enso(
+          value: q.done ? 1.0 : q.progress,
+          size: 38,
+          stroke: 3.6,
+          seed: q.def.title.length,
+          child: q.done ? const Icon(Icons.check, size: 15, color: Sumi.ink) : null,
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              q.def.title,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                decoration: q.done ? TextDecoration.lineThrough : null,
-                color: q.done ? theme.colorScheme.onSurfaceVariant : null,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(children: [
-              Expanded(child: AnimatedBar(value: q.done ? 1 : q.progress, color: q.done ? goodColor : xpColor, height: 6)),
-              const SizedBox(width: 8),
-              Text(q.detail, style: theme.textTheme.labelSmall),
-            ]),
+            Text(q.def.title, style: serif(18, color: q.done ? Sumi.muted : Sumi.ink)),
+            const SizedBox(height: 2),
+            Text(q.detail, style: const TextStyle(fontSize: 11, color: Sumi.muted)),
           ]),
         ),
         const SizedBox(width: 10),
@@ -484,81 +393,83 @@ class _TodayScreenState extends State<TodayScreen> {
     );
   }
 
+  Widget _levelCard(GameState g) {
+    return InkWell(
+      onTap: _openMe,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Expanded(
+            child: Text('Level ${g.level} · ${g.title}',
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: serif(24)),
+          ),
+          if (g.todayXp > 0)
+            Text('+${g.todayXp} today', style: const TextStyle(fontSize: 11.5, color: Sumi.muted)),
+        ]),
+        const SizedBox(height: 10),
+        AnimatedBar(value: g.levelProgress, color: Sumi.ink, height: 4),
+        const SizedBox(height: 8),
+        Text('${fmtInt(g.xpToNext)} xp to level ${g.level + 1}  ·  ${fmtInt(g.weekXp)} xp this week',
+            style: const TextStyle(fontSize: 11.5, color: Sumi.muted)),
+      ]),
+    );
+  }
+
   Widget _actions() {
     final w = _latestWeight;
     return Row(children: [
       Expanded(
-        child: FilledButton.icon(
-          onPressed: () => widget.onNavigate(1),
-          icon: const Icon(Icons.fitness_center, size: 18),
-          label: const Text('Train'),
-        ),
+        flex: 5,
+        child: FilledButton(onPressed: () => widget.onNavigate(1), child: const Text('Train')),
       ),
       const SizedBox(width: 8),
       Expanded(
-        child: FilledButton.tonalIcon(
-          onPressed: () => widget.onNavigate(2),
-          icon: const Icon(Icons.restaurant, size: 18),
-          label: const Text('Log food'),
-        ),
+        flex: 5,
+        child: OutlinedButton(onPressed: () => widget.onNavigate(2), child: const Text('Log food')),
       ),
       const SizedBox(width: 8),
       Expanded(
-        child: OutlinedButton.icon(
+        flex: 5,
+        child: OutlinedButton(
           onPressed: _logWeight,
-          icon: const Icon(Icons.monitor_weight_outlined, size: 18),
-          label: Text(w == null || w.date != todayKey() ? 'Weigh in' : '${fmtW(w.value)} kg'),
+          child: Text(w == null || w.date != todayKey() ? 'Weigh in' : '${fmtW(w.value)} kg'),
         ),
       ),
     ]);
   }
 
   Widget _reportTeaser(WeeklyReport r) {
-    final theme = Theme.of(context);
-    final color = scoreColor(r.score);
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReportScreen(report: r))),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              AnimatedRing(
-                value: r.score / 100,
-                color: color,
-                size: 72,
-                stroke: 8,
-                child: Text('${r.score}', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Your week: ${r.verdict}', style: theme.textTheme.titleMedium?.copyWith(color: color)),
-                  const SizedBox(height: 4),
-                  Text(r.headline, style: theme.textTheme.bodyMedium),
-                ]),
-              ),
+    return SumiCard(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReportScreen(report: r))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Enso(value: r.score / 100, size: 70, stroke: 6, seed: 5, child: Text('${r.score}', style: serif(24))),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const SumiLabel('Your week'),
+              const SizedBox(height: 4),
+              Text(r.verdict, style: serif(24)),
+              const SizedBox(height: 2),
+              Text(r.headline, style: const TextStyle(fontSize: 13, color: Sumi.ink2)),
             ]),
-            const SizedBox(height: 12),
-            for (final c in r.cards.take(3))
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(children: [
-                  Icon(c.icon, size: 18, color: kindColor(c.kind)),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(c.title, style: theme.textTheme.bodyMedium)),
-                ]),
-              ),
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text('See full report',
-                  style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary)),
-            ),
-          ]),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        for (final c in r.cards.take(3))
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Padding(padding: EdgeInsets.only(top: 6), child: BrushLine(width: 12, thickness: 1.8)),
+              const SizedBox(width: 10),
+              Expanded(child: Text(c.title, style: const TextStyle(fontSize: 13.5))),
+            ]),
+          ),
+        const SizedBox(height: 8),
+        const Align(
+          alignment: Alignment.centerRight,
+          child: Text('Read the full report  →', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
         ),
-      ),
+      ]),
     );
   }
 }

@@ -3,45 +3,49 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'util.dart';
+import 'visuals.dart';
 
-// ---------- Palette ----------
+// ---------- Palette (Sumi: black ink on paper) ----------
 
-const proteinColor = Color(0xFFF2777A);
-const carbsColor = Color(0xFF5CB8E4);
-const fatColor = Color(0xFFE8C547);
-const goodColor = Color(0xFF6FCF97);
-const warnColor = Color(0xFFF2C94C);
-const infoColor = Color(0xFF7FB2F0);
-const xpColor = Color(0xFFB794F6);
-const fireColor = Color(0xFFFF7A45);
+const proteinColor = Sumi.ink;
+const carbsColor = Color(0xFF6D675E);
+const fatColor = Color(0xFFA59E92);
+const goodColor = Sumi.ink;
+const warnColor = Sumi.ink2;
+const infoColor = Sumi.muted;
+const xpColor = Sumi.ink;
+const fireColor = Sumi.ink;
 
 const avatarColors = <Color>[
-  Color(0xFFF4A259),
-  Color(0xFF6FCF97),
-  Color(0xFF7FB2F0),
-  Color(0xFFB794F6),
-  Color(0xFFF2777A),
-  Color(0xFFE8C547),
-  Color(0xFF4FD1C5),
-  Color(0xFFF687B3),
+  Sumi.ink,
+  Color(0xFF3A3836),
+  Color(0xFF5E5952),
+  Color(0xFF827C72),
+  Color(0xFFA59E92),
+  Color(0xFFC9C2B6),
+  Color(0xFF2B2A28),
+  Color(0xFF6D675E),
 ];
 
 const muscleColors = <String, Color>{
-  'Chest': Color(0xFFF4A259),
-  'Back': Color(0xFF7FB2F0),
-  'Shoulders': Color(0xFFB794F6),
-  'Biceps': Color(0xFF4FD1C5),
-  'Triceps': Color(0xFFE8C547),
-  'Quads': Color(0xFF6FCF97),
-  'Hamstrings': Color(0xFFF2777A),
-  'Glutes': Color(0xFFF687B3),
-  'Calves': Color(0xFF63B3ED),
-  'Core': Color(0xFFA0AEC0),
+  'Chest': Sumi.ink,
+  'Back': Sumi.ink,
+  'Shoulders': Sumi.ink,
+  'Biceps': Sumi.ink,
+  'Triceps': Sumi.ink,
+  'Quads': Sumi.ink,
+  'Hamstrings': Sumi.ink,
+  'Glutes': Sumi.ink,
+  'Calves': Sumi.ink,
+  'Core': Sumi.ink,
 };
 
-Color muscleColor(String m) => muscleColors[m] ?? const Color(0xFF9AA5B1);
+Color muscleColor(String m) => muscleColors[m] ?? Sumi.ink2;
 
 Color avatarColor(int i) => avatarColors[i.abs() % avatarColors.length];
+
+/// Text colour that reads on top of [c].
+Color inkOn(Color c) => c.computeLuminance() > 0.35 ? Sumi.ink : Sumi.porcelain;
 
 String initials(String name) {
   final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
@@ -66,67 +70,32 @@ class Avatar extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-      child: Text(
-        initials(name),
-        style: TextStyle(color: const Color(0xFF1B1F27), fontWeight: FontWeight.w800, fontSize: size * 0.38),
-      ),
+      decoration: BoxDecoration(color: c, shape: BoxShape.circle, border: Border.all(color: Sumi.ink, width: 1)),
+      child: Text(initials(name), style: serif(size * 0.44, color: inkOn(c), height: 1)),
     );
     if (level == null) return circle;
     return Stack(clipBehavior: Clip.none, children: [
       circle,
       Positioned(
-        right: -4,
+        right: -5,
         bottom: -4,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
           decoration: BoxDecoration(
-            color: xpColor,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 2),
+            color: Sumi.porcelain,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Sumi.ink, width: 1),
           ),
-          child: Text('$level',
-              style: const TextStyle(color: Color(0xFF1B1F27), fontSize: 11, fontWeight: FontWeight.w800)),
+          child: Text('$level', style: const TextStyle(color: Sumi.ink, fontSize: 10, fontWeight: FontWeight.w600)),
         ),
       ),
     ]);
   }
 }
 
-// ---------- Animated ring ----------
+// ---------- Ensō rings ----------
 
-class RingPainter extends CustomPainter {
-  RingPainter({required this.value, required this.color, required this.track, this.stroke = 12});
-  final double value;
-  final Color color;
-  final Color track;
-  final double stroke;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - stroke / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final base = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..color = track;
-    canvas.drawCircle(center, radius, base);
-    final v = value.clamp(0.0, 1.0).toDouble();
-    if (v <= 0) return;
-    final arc = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round
-      ..color = color;
-    canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * v, false, arc);
-  }
-
-  @override
-  bool shouldRepaint(RingPainter old) =>
-      old.value != value || old.color != color || old.track != track || old.stroke != stroke;
-}
-
+/// A progress ring, drawn as a brushed ensō.
 class AnimatedRing extends StatelessWidget {
   const AnimatedRing({
     super.key,
@@ -145,23 +114,11 @@ class AnimatedRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: value),
-      duration: const Duration(milliseconds: 900),
-      curve: Curves.easeOutCubic,
-      builder: (context, v, _) => SizedBox(
-        width: size,
-        height: size,
-        child: CustomPaint(
-          painter: RingPainter(value: v, color: color, track: color.withAlpha(40), stroke: stroke),
-          child: Center(child: child),
-        ),
-      ),
-    );
+    return Enso(value: value, color: color, size: size, stroke: stroke * 0.85, seed: size.round(), child: child);
   }
 }
 
-/// Small ring with a label underneath, used for macros.
+/// Small ensō with a label underneath, used for macros.
 class MacroRing extends StatelessWidget {
   const MacroRing({
     super.key,
@@ -176,19 +133,19 @@ class MacroRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final pct = target <= 0 ? 0.0 : value / target;
     return Column(mainAxisSize: MainAxisSize.min, children: [
-      AnimatedRing(
+      Enso(
         value: pct,
-        color: pct > 1.1 ? theme.colorScheme.error : color,
-        size: 64,
-        stroke: 7,
-        child: Text('${value.round()}', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+        size: 62,
+        stroke: 5.5,
+        seed: label.length,
+        child: Text('${value.round()}', style: serif(19)),
       ),
       const SizedBox(height: 6),
-      Text(label, style: theme.textTheme.labelMedium),
-      Text('of ${target.round()} g', style: theme.textTheme.bodySmall),
+      SumiLabel(label),
+      const SizedBox(height: 2),
+      Text('of ${target.round()} g', style: const TextStyle(fontSize: 11, color: Sumi.muted)),
     ]);
   }
 }
@@ -221,7 +178,7 @@ class MacroBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Text(label, style: theme.textTheme.bodyMedium),
+            SumiLabel(label),
             const Spacer(),
             Text('${value.round()} / ${target.round()} $unit', style: theme.textTheme.bodySmall),
           ]),
@@ -249,9 +206,9 @@ class AnimatedBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(height / 2),
         child: LinearProgressIndicator(
           value: v,
-          minHeight: height,
+          minHeight: math.min(height, 5),
           color: color,
-          backgroundColor: color.withAlpha(40),
+          backgroundColor: Sumi.rule,
         ),
       ),
     );
@@ -266,18 +223,15 @@ class XpPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: done ? xpColor : xpColor.withAlpha(40),
-        borderRadius: BorderRadius.circular(10),
+        color: done ? Sumi.ink : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: done ? Sumi.ink : Sumi.edge),
       ),
       child: Text(
-        '+$xp XP',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: done ? const Color(0xFF1B1F27) : xpColor,
-        ),
+        '+$xp xp',
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: done ? Sumi.porcelain : Sumi.muted),
       ),
     );
   }
@@ -292,19 +246,19 @@ class StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (icon != null) Icon(icon, size: 18, color: color ?? theme.colorScheme.primary),
-          if (icon != null) const SizedBox(height: 6),
-          Text(value, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 2),
-          Text(label, style: theme.textTheme.bodySmall, maxLines: 2),
-        ]),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Sumi.porcelain.withAlpha(200),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Sumi.rule),
       ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(value, style: serif(26), maxLines: 1, overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 4),
+        Text(label.toUpperCase(),
+            style: const TextStyle(fontSize: 9.5, letterSpacing: 1.6, color: Sumi.muted), maxLines: 2),
+      ]),
     );
   }
 }
@@ -319,9 +273,9 @@ class ActivityHeatmap extends StatelessWidget {
   final void Function(String date, int xp)? onTap;
 
   Color _cell(BuildContext context, int xp, bool future) {
-    final base = Theme.of(context).colorScheme.primary;
+    const base = Sumi.ink;
     if (future) return Colors.transparent;
-    if (xp <= 0) return Theme.of(context).colorScheme.surfaceContainerHighest;
+    if (xp <= 0) return Sumi.wash;
     if (xp < 30) return base.withAlpha(70);
     if (xp < 80) return base.withAlpha(130);
     if (xp < 150) return base.withAlpha(190);
@@ -392,9 +346,9 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.only(top: 18, bottom: 6),
       child: Row(children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        Text(title, style: serif(26)),
         const Spacer(),
         if (trailing != null) trailing!,
       ]),
@@ -506,13 +460,9 @@ Future<void> showBadgeUnlocked(BuildContext context, String name, String descrip
         duration: const Duration(milliseconds: 600),
         curve: Curves.elasticOut,
         builder: (context, s, child) => Transform.scale(scale: s, child: child),
-        child: CircleAvatar(
-          radius: 34,
-          backgroundColor: xpColor,
-          child: Icon(icon, size: 36, color: const Color(0xFF1B1F27)),
-        ),
+        child: InkSeal(name.split(' ').take(2).join('\n'), size: 72),
       ),
-      title: Text('Badge unlocked: $name'),
+      title: Text('Seal earned: $name', textAlign: TextAlign.center),
       content: Text(description, textAlign: TextAlign.center),
       actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Nice'))],
     ),

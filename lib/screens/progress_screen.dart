@@ -11,14 +11,14 @@ import '../util.dart';
 import '../widgets.dart';
 
 const _muscleColors = <Color>[
-  Color(0xFFF4A259),
-  Color(0xFF7FB2F0),
-  Color(0xFF6FCF97),
-  Color(0xFFB794F6),
-  Color(0xFFF2777A),
-  Color(0xFFE8C547),
-  Color(0xFF4FD1C5),
-  Color(0xFFF687B3),
+  Color(0xFF151413),
+  Color(0xFF3A3836),
+  Color(0xFF5E5952),
+  Color(0xFF827C72),
+  Color(0xFFA59E92),
+  Color(0xFFC0B9AD),
+  Color(0xFF2B2A28),
+  Color(0xFF6D675E),
 ];
 
 class ProgressScreen extends StatefulWidget {
@@ -407,11 +407,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   ? [
                       Text(parts[touched].$1, style: theme.textTheme.titleSmall),
                       Text('${(parts[touched].$2 / total * 100).round()}%',
-                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                          style: theme.textTheme.headlineSmall),
                       Text(detail(touched), style: theme.textTheme.bodySmall),
                     ]
                   : [
-                      Text(centerTop, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                      Text(centerTop, style: theme.textTheme.headlineSmall),
                       Text(centerBottom, style: theme.textTheme.bodySmall),
                     ],
             ),
@@ -440,7 +440,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final otherSets = entries.skip(7).fold<int>(0, (a, e) => a + e.value);
     final parts = <(String, double, Color)>[
       for (var i = 0; i < top.length; i++) (top[i].key, top[i].value.toDouble(), _muscleColors[i]),
-      if (otherSets > 0) ('Other', otherSets.toDouble(), Colors.grey),
+      if (otherSets > 0) ('Other', otherSets.toDouble(), const Color(0xFFD6D0C4)),
     ];
     final total = parts.fold<double>(0, (a, p) => a + p.$2);
     final weeks = _range / 7;

@@ -6,6 +6,7 @@ import '../game.dart';
 import '../session.dart';
 import '../update.dart';
 import '../util.dart';
+import '../visuals.dart';
 import '../widgets.dart';
 import 'access_screen.dart';
 import 'auth_screen.dart';
@@ -85,7 +86,7 @@ class _MeScreenState extends State<MeScreen> {
           CircleAvatar(
             radius: 36,
             backgroundColor: earned ? xpColor : theme.colorScheme.surfaceContainerHighest,
-            child: Icon(b.icon, size: 36, color: earned ? const Color(0xFF1B1F27) : theme.colorScheme.onSurfaceVariant),
+            child: Icon(b.icon, size: 36, color: earned ? Sumi.porcelain : theme.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 12),
           Text(b.name, style: theme.textTheme.titleLarge),
@@ -260,7 +261,7 @@ class _MeScreenState extends State<MeScreen> {
             backgroundColor: earned ? xpColor : theme.colorScheme.surfaceContainerHighest,
             child: Icon(
               earned ? b.icon : Icons.lock_outline,
-              color: earned ? const Color(0xFF1B1F27) : theme.colorScheme.onSurfaceVariant,
+              color: earned ? Sumi.porcelain : theme.colorScheme.onSurfaceVariant,
               size: earned ? 28 : 20,
             ),
           ),

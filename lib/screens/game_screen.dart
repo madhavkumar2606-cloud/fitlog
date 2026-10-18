@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../db.dart';
 import '../util.dart';
+import '../visuals.dart';
 import '../widgets.dart';
 
 // ---------------- Game model ----------------
@@ -155,7 +156,7 @@ class DashGame {
           lives--;
           hurt = 1.2;
           obstacles.remove(o);
-          pops.add(_Pop(playerX, floor - py - playerH - 10, 'Ouch!', const Color(0xFFF2777A)));
+          pops.add(_Pop(playerX, floor - py - playerH - 10, 'Ouch!', const Color(0xFF8E2F25)));
           if (lives <= 0) over = true;
           break;
         }
@@ -169,7 +170,7 @@ class DashGame {
         bonus += pts;
         if (!it.junk) healthy++;
         pops.add(_Pop(it.x, floor - it.y - 20, pts > 0 ? '+$pts' : '$pts',
-            it.junk ? const Color(0xFFF2777A) : const Color(0xFF6FCF97)));
+            it.junk ? const Color(0xFF8E2F25) : const Color(0xFF151413)));
       }
     }
   }
@@ -204,17 +205,17 @@ class _DashPainter extends CustomPainter {
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF1D2A3A), Color(0xFF243447)],
+          colors: [Color(0xFFF3F0EA), Color(0xFFEEEBE5)],
         ).createShader(Offset.zero & size),
     );
     // Parallax: windows and racks drifting slowly.
     final wallShift = (g.dist * 0.25) % 220;
-    final win = Paint()..color = const Color(0xFF2F4258);
+    final win = Paint()..color = const Color(0xFFE6E1D8);
     for (var x = -wallShift; x < size.width + 220; x += 220) {
       canvas.drawRRect(
           RRect.fromRectAndRadius(Rect.fromLTWH(x + 30, floor - 230, 90, 110), const Radius.circular(6)), win);
       final rack = Paint()
-        ..color = const Color(0xFF3A4D63)
+        ..color = const Color(0xFFD3CCC0)
         ..strokeWidth = 6
         ..strokeCap = StrokeCap.round;
       canvas.drawLine(Offset(x + 160, floor), Offset(x + 160, floor - 120), rack);
@@ -222,12 +223,12 @@ class _DashPainter extends CustomPainter {
       canvas.drawLine(Offset(x + 150, floor - 90), Offset(x + 210, floor - 90), rack);
     }
     // Floor with moving stripes.
-    canvas.drawRect(Rect.fromLTWH(0, floor, size.width, size.height - floor), Paint()..color = const Color(0xFF151C25));
+    canvas.drawRect(Rect.fromLTWH(0, floor, size.width, size.height - floor), Paint()..color = const Color(0xFFE9E5DE));
     canvas.drawLine(Offset(0, floor), Offset(size.width, floor),
         Paint()
           ..color = primary
           ..strokeWidth = 3);
-    final stripe = Paint()..color = const Color(0xFF222C38);
+    final stripe = Paint()..color = const Color(0xFFD9D3C8);
     final floorShift = g.dist % 60;
     for (var x = -floorShift; x < size.width; x += 60) {
       canvas.drawRect(Rect.fromLTWH(x, floor + 14, 30, 6), stripe);
@@ -264,8 +265,8 @@ class _DashPainter extends CustomPainter {
   }
 
   void _obstacle(Canvas c, _Obstacle o, double floor) {
-    final metal = Paint()..color = const Color(0xFFB8C2CC);
-    final dark = Paint()..color = const Color(0xFF3B4048);
+    final metal = Paint()..color = const Color(0xFF6D675E);
+    final dark = Paint()..color = const Color(0xFF151413);
     switch (o.kind) {
       case 0: // dumbbell
         final cy = floor - o.h / 2;
@@ -282,11 +283,11 @@ class _DashPainter extends CustomPainter {
               ..color = dark.color
               ..style = PaintingStyle.stroke
               ..strokeWidth = 6);
-        c.drawCircle(body.translate(-5, -4), 4, Paint()..color = const Color(0x33FFFFFF));
+        c.drawCircle(body.translate(-5, -4), 4, Paint()..color = const Color(0x40EEEBE5));
       default: // bench
         final top = floor - o.h;
         c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(o.x, top, o.w, 10), const Radius.circular(4)),
-            Paint()..color = const Color(0xFFF2777A));
+            Paint()..color = const Color(0xFF151413));
         c.drawRect(Rect.fromLTWH(o.x + 8, top + 10, 6, o.h - 10), metal);
         c.drawRect(Rect.fromLTWH(o.x + o.w - 14, top + 10, 6, o.h - 10), metal);
     }
@@ -298,7 +299,7 @@ class _DashPainter extends CustomPainter {
     final shoulderY = r.top + 18;
     final cx = r.center.dx;
     final line = Paint()
-      ..color = const Color(0xFFE1E2E8)
+      ..color = const Color(0xFF151413)
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;
     final shirt = Paint()
@@ -328,11 +329,11 @@ class _DashPainter extends CustomPainter {
     c.drawLine(Offset(cx + 2, shoulderY + 4), Offset(cx + 2 - math.sin(arm) * 18, shoulderY + 4 + math.cos(arm) * 18), line);
     // Head and headband.
     final head = Offset(cx + 3, r.top + 6);
-    c.drawCircle(head, 9, Paint()..color = const Color(0xFFE8B98A));
+    c.drawCircle(head, 9, Paint()..color = const Color(0xFF151413));
     c.drawLine(head.translate(-9, -3), head.translate(9, -3),
         Paint()
-          ..color = const Color(0xFFF2777A)
-          ..strokeWidth = 3);
+          ..color = const Color(0xFFEEEBE5)
+          ..strokeWidth = 2);
   }
 
   @override
@@ -428,7 +429,7 @@ class _GymDashScreenState extends State<GymDashScreen> with SingleTickerProvider
     final theme = Theme.of(context);
     final g = _game;
     return Scaffold(
-      backgroundColor: const Color(0xFF1D2A3A),
+      backgroundColor: Sumi.paper,
       body: SafeArea(
         child: LayoutBuilder(builder: (context, box) {
           g.size = box.biggest;
@@ -442,7 +443,7 @@ class _GymDashScreenState extends State<GymDashScreen> with SingleTickerProvider
                 left: 8,
                 top: 4,
                 child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
+                  icon: const Icon(Icons.close, color: Sumi.ink),
                   tooltip: 'Exit game',
                   onPressed: () => Navigator.pop(context),
                 ),
@@ -452,9 +453,8 @@ class _GymDashScreenState extends State<GymDashScreen> with SingleTickerProvider
                 right: 0,
                 top: 10,
                 child: Column(children: [
-                  Text('${g.score}',
-                      style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Colors.white)),
-                  Text('Best $_best', style: const TextStyle(color: Colors.white70)),
+                  Text('${g.score}', style: serif(38)),
+                  Text('Best $_best', style: const TextStyle(fontSize: 12, color: Sumi.muted)),
                 ]),
               ),
               Positioned(
@@ -465,7 +465,7 @@ class _GymDashScreenState extends State<GymDashScreen> with SingleTickerProvider
                     Padding(
                       padding: const EdgeInsets.only(left: 4),
                       child: Icon(i < g.lives ? Icons.favorite : Icons.favorite_border,
-                          color: const Color(0xFFF2777A), size: 24),
+                          color: Sumi.ink, size: 22),
                     ),
                 ]),
               ),
@@ -484,7 +484,7 @@ class _GymDashScreenState extends State<GymDashScreen> with SingleTickerProvider
       child: Padding(
         padding: const EdgeInsets.all(22),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Gym Dash', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900)),
+          Text('Gym Dash', style: serif(34)),
           const SizedBox(height: 10),
           const Text('Tap to jump. Tap again in the air to double jump.', textAlign: TextAlign.center),
           const SizedBox(height: 10),
@@ -492,10 +492,10 @@ class _GymDashScreenState extends State<GymDashScreen> with SingleTickerProvider
               textAlign: TextAlign.center, style: TextStyle(height: 1.5)),
           const SizedBox(height: 12),
           Text('Reach 100, 500 and 1,000 points for up to ${gameXpTiers.length * gameXpPerTier} XP a day.',
-              textAlign: TextAlign.center, style: theme.textTheme.bodySmall?.copyWith(color: xpColor)),
+              textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
           const SizedBox(height: 16),
           Text('Tap anywhere to start',
-              style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary)),
+              style: serif(18, italic: true)),
         ]),
       ),
     );
@@ -509,12 +509,9 @@ class _GymDashScreenState extends State<GymDashScreen> with SingleTickerProvider
         padding: const EdgeInsets.all(22),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(_newBest ? 'New best!' : 'Workout over!',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: _newBest ? warnColor : null,
-              )),
+              style: serif(30)),
           const SizedBox(height: 8),
-          Text('${g.score}', style: theme.textTheme.displayMedium?.copyWith(fontWeight: FontWeight.w900)),
+          Text('${g.score}', style: serif(56)),
           Text('points  |  best $_best', style: theme.textTheme.bodyMedium),
           const SizedBox(height: 8),
           Text('${g.healthy} healthy foods grabbed', style: theme.textTheme.bodySmall),
@@ -542,39 +539,26 @@ class GymDashCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () async {
-          await Navigator.push(context, MaterialPageRoute(builder: (_) => const GymDashScreen()));
-          onPlayed();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(children: [
-            Container(
-              width: 52,
-              height: 52,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withAlpha(40),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Text('🏃', style: TextStyle(fontSize: 28)),
+    return SumiCard(
+      onTap: () async {
+        await Navigator.push(context, MaterialPageRoute(builder: (_) => const GymDashScreen()));
+        onPlayed();
+      },
+      child: Row(children: [
+        const Enso(value: 0.75, size: 46, stroke: 4, seed: 9, child: Icon(Icons.play_arrow, size: 18, color: Sumi.ink)),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Gym Dash', style: serif(22)),
+            const SizedBox(height: 2),
+            Text(
+              best > 0 ? 'Your best: ${fmtInt(best)}. Beat it for bonus xp.' : 'Mini game: dodge the gym gear, grab the protein.',
+              style: const TextStyle(fontSize: 12, color: Sumi.muted),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Gym Dash', style: theme.textTheme.titleMedium),
-                Text(best > 0 ? 'Your best: ${fmtInt(best)}. Beat it for bonus XP.' : 'Mini game: dodge the gym gear, grab the protein.',
-                    style: theme.textTheme.bodySmall),
-              ]),
-            ),
-            Icon(Icons.play_circle_fill, color: theme.colorScheme.primary, size: 36),
           ]),
         ),
-      ),
+        const Text('Play  →', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+      ]),
     );
   }
 }

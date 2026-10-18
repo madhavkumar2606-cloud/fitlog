@@ -13,7 +13,7 @@ Color kindColor(ReportKind k) => switch (k) {
 
 Color scoreColor(int score) {
   if (score >= 85) return goodColor;
-  if (score >= 70) return const Color(0xFF9AD27A);
+  if (score >= 70) return goodColor;
   if (score >= 45) return warnColor;
   return fireColor;
 }
@@ -43,7 +43,7 @@ class ReportScreen extends StatelessWidget {
                   tween: Tween(begin: 0, end: r.score.toDouble()),
                   duration: const Duration(milliseconds: 900),
                   builder: (context, v, _) => Text('${v.round()}',
-                      style: theme.textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900)),
+                      style: theme.textTheme.displaySmall),
                 ),
                 Text('out of 100', style: theme.textTheme.bodySmall),
               ]),

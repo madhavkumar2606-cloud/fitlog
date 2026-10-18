@@ -136,7 +136,7 @@ class _AccessScreenState extends State<AccessScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text('Welcome${me == null ? '' : ', ${firstName(me.displayName)}'}!',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                      style: theme.textTheme.headlineSmall),
                   const SizedBox(height: 6),
                   Text(
                     _config.message.isNotEmpty
@@ -152,8 +152,7 @@ class _AccessScreenState extends State<AccessScreen> {
                         child: Column(children: [
                           if (_config.priceText.isNotEmpty)
                             Text(_config.priceText,
-                                style: theme.textTheme.headlineMedium
-                                    ?.copyWith(fontWeight: FontWeight.w900, color: theme.colorScheme.primary)),
+                                style: theme.textTheme.headlineMedium),
                           const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.all(10),
