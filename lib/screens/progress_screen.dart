@@ -11,14 +11,14 @@ import '../util.dart';
 import '../widgets.dart';
 
 const _muscleColors = <Color>[
-  Color(0xFF151413),
-  Color(0xFF3A3836),
-  Color(0xFF5E5952),
-  Color(0xFF827C72),
-  Color(0xFFA59E92),
-  Color(0xFFC0B9AD),
-  Color(0xFF2B2A28),
-  Color(0xFF6D675E),
+  Color(0xFFECE6DA),
+  Color(0xFFCFC8BB),
+  Color(0xFFB3AC9F),
+  Color(0xFF978F83),
+  Color(0xFF7B746A),
+  Color(0xFF5F5952),
+  Color(0xFFD9D3C7),
+  Color(0xFF8A847A),
 ];
 
 class ProgressScreen extends StatefulWidget {
@@ -98,7 +98,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
                 children: [
                   SegmentedButton<int>(
                     segments: const [
@@ -440,7 +440,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final otherSets = entries.skip(7).fold<int>(0, (a, e) => a + e.value);
     final parts = <(String, double, Color)>[
       for (var i = 0; i < top.length; i++) (top[i].key, top[i].value.toDouble(), _muscleColors[i]),
-      if (otherSets > 0) ('Other', otherSets.toDouble(), const Color(0xFFD6D0C4)),
+      if (otherSets > 0) ('Other', otherSets.toDouble(), const Color(0xFF3A3733)),
     ];
     final total = parts.fold<double>(0, (a, p) => a + p.$2);
     final weeks = _range / 7;

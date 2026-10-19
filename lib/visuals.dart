@@ -3,19 +3,22 @@ import 'dart:ui' show PointMode;
 
 import 'package:flutter/material.dart';
 
-/// Sumi design language: washi paper, black ink, ensō circles, serif numbers.
+/// Night Ink design language: black paper, warm white ink, ensō circles, serif numbers.
+/// Names keep their roles: [ink] is the foreground colour, [paper] the background.
 class Sumi {
-  static const ink = Color(0xFF151413);
-  static const ink2 = Color(0xFF3A3836);
-  static const muted = Color(0xFF6D675E);
-  static const faint = Color(0xFF9A948A);
-  static const rule = Color(0xFFDDD7CC);
-  static const edge = Color(0xFFCFC8BB);
-  static const paper = Color(0xFFEEEBE5);
-  static const porcelain = Color(0xFFFAF8F4);
-  static const sheet = Color(0xFFF3F0EA);
-  static const wash = Color(0xFFE3DED4);
-  static const error = Color(0xFF8E2F25);
+  static const ink = Color(0xFFECE6DA);
+  static const ink2 = Color(0xFFCFC8BB);
+  static const muted = Color(0xFFA39D92);
+  static const faint = Color(0xFF77726A);
+  static const rule = Color(0xFF2C2A27);
+  static const edge = Color(0xFF3A3733);
+  static const paper = Color(0xFF141312);
+  static const porcelain = Color(0xFF1C1B19);
+  static const sheet = Color(0xFF1A1917);
+  static const wash = Color(0xFF262421);
+  static const error = Color(0xFFD0665A);
+  static const seal = Color(0xFFB5402F);
+  static const sealText = Color(0xFFF6EFE4);
   static const serif = 'InstrumentSerif';
   static const sans = 'InterTight';
 }
@@ -88,7 +91,7 @@ class _PaperPainter extends CustomPainter {
       PointMode.points,
       a,
       Paint()
-        ..color = dark ? const Color(0x10FFFFFF) : const Color(0x40CFC8BB)
+        ..color = dark ? const Color(0x10FFFFFF) : const Color(0x10ECE6DA)
         ..strokeWidth = 1.6
         ..strokeCap = StrokeCap.round,
     );
@@ -341,7 +344,8 @@ class InkSeal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = faded ? Sumi.ink.withAlpha(45) : Sumi.ink;
+    final bg = faded ? Sumi.seal.withAlpha(60) : Sumi.seal;
+    final fg = faded ? Sumi.sealText.withAlpha(110) : Sumi.sealText;
     return Transform.rotate(
       angle: angle,
       child: Container(
@@ -349,14 +353,15 @@ class InkSeal extends StatelessWidget {
         height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          border: Border.all(color: c, width: size > 50 ? 2.6 : 2.2),
-          borderRadius: BorderRadius.circular(4),
+          color: bg,
+          borderRadius: BorderRadius.circular(size * 0.1),
+          border: Border.all(color: fg.withAlpha(faded ? 40 : 75), width: size > 50 ? 2.4 : 1.8),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(3),
+          padding: const EdgeInsets.all(4),
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(text, textAlign: TextAlign.center, style: serif(size * 0.3, color: c, height: 1.0)),
+            child: Text(text, textAlign: TextAlign.center, style: serif(size * 0.3, color: fg, height: 1.0)),
           ),
         ),
       ),
@@ -441,7 +446,7 @@ class SumiTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xF2EEEBE5),
+        color: Color(0xF2141312),
         border: Border(top: BorderSide(color: Sumi.rule)),
       ),
       child: SafeArea(

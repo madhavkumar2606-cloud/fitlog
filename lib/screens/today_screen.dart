@@ -152,7 +152,7 @@ class _TodayScreenState extends State<TodayScreen> {
             : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(22, 14, 22, 32),
+                  padding: const EdgeInsets.fromLTRB(22, 14, 22, 120),
                   children: [
                     _header(plan, game),
                     const SizedBox(height: 22),

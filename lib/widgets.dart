@@ -8,8 +8,8 @@ import 'visuals.dart';
 // ---------- Palette (Sumi: black ink on paper) ----------
 
 const proteinColor = Sumi.ink;
-const carbsColor = Color(0xFF6D675E);
-const fatColor = Color(0xFFA59E92);
+const carbsColor = Color(0xFFA39D92);
+const fatColor = Color(0xFF6D675E);
 const goodColor = Sumi.ink;
 const warnColor = Sumi.ink2;
 const infoColor = Sumi.muted;
@@ -45,7 +45,7 @@ Color muscleColor(String m) => muscleColors[m] ?? Sumi.ink2;
 Color avatarColor(int i) => avatarColors[i.abs() % avatarColors.length];
 
 /// Text colour that reads on top of [c].
-Color inkOn(Color c) => c.computeLuminance() > 0.35 ? Sumi.ink : Sumi.porcelain;
+Color inkOn(Color c) => c.computeLuminance() > 0.35 ? const Color(0xFF151413) : const Color(0xFFECE6DA);
 
 String initials(String name) {
   final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();

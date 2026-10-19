@@ -1,7 +1,7 @@
 name: fitlog
 description: Workout tracker + calorie tracker that work together.
 publish_to: 'none'
-version: 2.7.0+10
+version: 2.7.1+11
 
 environment:
   sdk: '>=3.9.0 <4.0.0'

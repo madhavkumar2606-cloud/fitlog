@@ -108,7 +108,7 @@ class _FoodScreenState extends State<FoodScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(22, 4, 22, 32),
+                padding: const EdgeInsets.fromLTRB(22, 4, 22, 120),
                 children: [
                   _hero(totals, t),
                   if (_recent.isNotEmpty && isToday) ...[
@@ -199,7 +199,7 @@ class _FoodScreenState extends State<FoodScreen> {
       color: Sumi.porcelain,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFD6D0C4)),
+        side: const BorderSide(color: Color(0xFF3A3733)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),

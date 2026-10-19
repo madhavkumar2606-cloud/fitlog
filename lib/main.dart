@@ -9,16 +9,18 @@ import 'screens/profile_screen.dart';
 import 'screens/progress_screen.dart';
 import 'screens/today_screen.dart';
 import 'screens/train_screen.dart';
+import 'motion.dart';
 import 'session.dart';
+import 'splash.dart';
 import 'update.dart';
 import 'visuals.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark.copyWith(
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light.copyWith(
     statusBarColor: Colors.transparent,
     systemNavigationBarColor: Sumi.paper,
-    systemNavigationBarIconBrightness: Brightness.dark,
+    systemNavigationBarIconBrightness: Brightness.light,
   ));
   runApp(const FitLogApp());
   AppSession.instance.start();
@@ -33,14 +35,14 @@ class FitLogApp extends StatelessWidget {
       title: 'FitLog',
       debugShowCheckedModeBanner: false,
       theme: sumiTheme(),
-      home: const _Gate(),
+      home: const _Launch(),
     );
   }
 }
 
-/// The Sumi theme: washi paper, black ink, serif titles, crisp buttons and black-and-white switches.
+/// The Night Ink theme: black paper, warm white ink, serif titles, crisp buttons and ink switches.
 ThemeData sumiTheme() {
-  const scheme = ColorScheme.light(
+  const scheme = ColorScheme.dark(
     primary: Sumi.ink,
     onPrimary: Sumi.porcelain,
     primaryContainer: Sumi.wash,
@@ -53,14 +55,14 @@ ThemeData sumiTheme() {
     onTertiary: Sumi.porcelain,
     error: Sumi.error,
     onError: Sumi.porcelain,
-    errorContainer: Color(0xFFEBD9D4),
+    errorContainer: Color(0xFF3A1F1B),
     onErrorContainer: Sumi.error,
     surface: Sumi.paper,
     onSurface: Sumi.ink,
     surfaceContainerLowest: Sumi.porcelain,
     surfaceContainerLow: Sumi.porcelain,
     surfaceContainer: Sumi.sheet,
-    surfaceContainerHigh: Color(0xFFE9E5DE),
+    surfaceContainerHigh: Color(0xFF24221F),
     surfaceContainerHighest: Sumi.wash,
     onSurfaceVariant: Sumi.muted,
     outline: Sumi.edge,
@@ -131,7 +133,7 @@ ThemeData sumiTheme() {
         foregroundColor: Sumi.ink,
         backgroundColor: Sumi.porcelain,
         minimumSize: const Size(0, 48),
-        side: const BorderSide(color: Color(0xFFD6D0C4)),
+        side: const BorderSide(color: Color(0xFF3A3733)),
         shape: buttonShape,
         textStyle: const TextStyle(fontFamily: Sumi.sans, fontSize: 14.5, fontWeight: FontWeight.w500),
       ),
@@ -152,7 +154,7 @@ ThemeData sumiTheme() {
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((st) => Sumi.porcelain),
       trackColor: WidgetStateProperty.resolveWith(
-          (st) => st.contains(WidgetState.selected) ? Sumi.ink : const Color(0xFFE3DED5)),
+          (st) => st.contains(WidgetState.selected) ? Sumi.ink : const Color(0xFF2C2A27)),
       trackOutlineColor: WidgetStateProperty.resolveWith(
           (st) => st.contains(WidgetState.selected) ? Sumi.ink : Sumi.edge),
     ),
@@ -165,7 +167,7 @@ ThemeData sumiTheme() {
       backgroundColor: Sumi.porcelain,
       selectedColor: Sumi.ink,
       checkmarkColor: Sumi.porcelain,
-      side: const BorderSide(color: Color(0xFFD6D0C4)),
+      side: const BorderSide(color: Color(0xFF3A3733)),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       labelStyle: const TextStyle(fontFamily: Sumi.sans, fontSize: 13, color: Sumi.ink),
       secondaryLabelStyle: const TextStyle(fontFamily: Sumi.sans, fontSize: 13, color: Sumi.porcelain),
@@ -181,7 +183,7 @@ ThemeData sumiTheme() {
     ),
     textSelectionTheme: const TextSelectionThemeData(
       cursorColor: Sumi.ink,
-      selectionColor: Color(0x33151413),
+      selectionColor: Color(0x33ECE6DA),
       selectionHandleColor: Sumi.ink,
     ),
     dialogTheme: DialogThemeData(
@@ -251,16 +253,32 @@ class _Gate extends StatelessWidget {
   }
 }
 
+/// Plays the launch animation over the app on every start, then gets out of the way.
+class _Launch extends StatefulWidget {
+  const _Launch();
+
+  @override
+  State<_Launch> createState() => _LaunchState();
+}
+
+class _LaunchState extends State<_Launch> {
+  bool _introDone = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(children: [
+      const Positioned.fill(child: _Gate()),
+      if (!_introDone) Positioned.fill(child: LaunchIntro(onDone: () => setState(() => _introDone = true))),
+    ]);
+  }
+}
+
 class _Splash extends StatelessWidget {
   const _Splash();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Enso(value: 0.92, size: 180, stroke: 13, child: Text('FitLog', style: serif(36))),
-      ),
-    );
+    return const Scaffold(backgroundColor: kSplashBg, body: LaunchMark());
   }
 }
 
@@ -295,14 +313,12 @@ class _HomeShellState extends State<HomeShell> {
     ];
     return Scaffold(
       backgroundColor: Sumi.paper,
+      extendBody: true,
       body: Stack(children: [
         const Positioned.fill(child: AppBackground()),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: KeyedSubtree(key: ValueKey(_index), child: pages[_index]),
-        ),
+        Positioned.fill(child: InkTabSwitcher(index: _index, child: pages[_index])),
       ]),
-      bottomNavigationBar: SumiTabBar(
+      bottomNavigationBar: GlassTabBar(
         index: _index,
         onTap: _go,
         labels: const ['Today', 'Train', 'Food', 'Progress', 'Friends'],

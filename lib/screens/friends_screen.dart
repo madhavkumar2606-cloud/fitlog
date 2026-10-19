@@ -55,7 +55,7 @@ class _SignInPitch extends StatelessWidget {
             Expanded(child: Text(text, style: theme.textTheme.bodyLarge)),
           ]),
         );
-    return ListView(padding: const EdgeInsets.all(24), children: [
+    return ListView(padding: const EdgeInsets.fromLTRB(24, 24, 24, 120), children: [
       const Icon(Icons.emoji_events, size: 64, color: warnColor),
       const SizedBox(height: 12),
       Text('Compete with friends', textAlign: TextAlign.center, style: theme.textTheme.headlineSmall),
@@ -162,7 +162,7 @@ class _LeaderboardTabState extends State<_LeaderboardTab> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
         children: [
           Row(children: [
             Text('${shortDate(dayKey(ws))} to ${shortDate(dayKey(we))}', style: theme.textTheme.titleMedium),
@@ -424,7 +424,7 @@ class _FriendsTabState extends State<_FriendsTab> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
         children: [
           Card(
             child: ListTile(
@@ -588,7 +588,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(p.displayName)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
         children: [
           Center(
             child: AnimatedRing(

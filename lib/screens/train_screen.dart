@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../db.dart';
 import '../models.dart';
+import '../motion.dart';
 import '../util.dart';
 import '../visuals.dart';
 import '../widgets.dart';
@@ -86,7 +87,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
 
   Future<void> _start(Routine r) async {
     final saved =
-        await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => ActiveSessionScreen(routine: r)));
+        await Navigator.push<bool>(context, inkWorkoutRoute<bool>(title: r.name, page: ActiveSessionScreen(routine: r)));
     if (saved == true) await _load();
   }
 
@@ -155,7 +156,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(22, 14, 22, 100),
+                  padding: const EdgeInsets.fromLTRB(22, 14, 22, 150),
                   children: [
                     _weekHeader(),
                     const SizedBox(height: 22),

@@ -156,7 +156,7 @@ class DashGame {
           lives--;
           hurt = 1.2;
           obstacles.remove(o);
-          pops.add(_Pop(playerX, floor - py - playerH - 10, 'Ouch!', const Color(0xFF8E2F25)));
+          pops.add(_Pop(playerX, floor - py - playerH - 10, 'Ouch!', const Color(0xFFD0665A)));
           if (lives <= 0) over = true;
           break;
         }
@@ -170,7 +170,7 @@ class DashGame {
         bonus += pts;
         if (!it.junk) healthy++;
         pops.add(_Pop(it.x, floor - it.y - 20, pts > 0 ? '+$pts' : '$pts',
-            it.junk ? const Color(0xFF8E2F25) : const Color(0xFF151413)));
+            it.junk ? const Color(0xFFD0665A) : const Color(0xFFECE6DA)));
       }
     }
   }
@@ -205,17 +205,17 @@ class _DashPainter extends CustomPainter {
         ..shader = const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFF3F0EA), Color(0xFFEEEBE5)],
+          colors: [Color(0xFF1A1917), Color(0xFF141312)],
         ).createShader(Offset.zero & size),
     );
     // Parallax: windows and racks drifting slowly.
     final wallShift = (g.dist * 0.25) % 220;
-    final win = Paint()..color = const Color(0xFFE6E1D8);
+    final win = Paint()..color = const Color(0xFF24221F);
     for (var x = -wallShift; x < size.width + 220; x += 220) {
       canvas.drawRRect(
           RRect.fromRectAndRadius(Rect.fromLTWH(x + 30, floor - 230, 90, 110), const Radius.circular(6)), win);
       final rack = Paint()
-        ..color = const Color(0xFFD3CCC0)
+        ..color = const Color(0xFF3A3733)
         ..strokeWidth = 6
         ..strokeCap = StrokeCap.round;
       canvas.drawLine(Offset(x + 160, floor), Offset(x + 160, floor - 120), rack);
@@ -223,12 +223,12 @@ class _DashPainter extends CustomPainter {
       canvas.drawLine(Offset(x + 150, floor - 90), Offset(x + 210, floor - 90), rack);
     }
     // Floor with moving stripes.
-    canvas.drawRect(Rect.fromLTWH(0, floor, size.width, size.height - floor), Paint()..color = const Color(0xFFE9E5DE));
+    canvas.drawRect(Rect.fromLTWH(0, floor, size.width, size.height - floor), Paint()..color = const Color(0xFF1E1D1B));
     canvas.drawLine(Offset(0, floor), Offset(size.width, floor),
         Paint()
           ..color = primary
           ..strokeWidth = 3);
-    final stripe = Paint()..color = const Color(0xFFD9D3C8);
+    final stripe = Paint()..color = const Color(0xFF2C2A27);
     final floorShift = g.dist % 60;
     for (var x = -floorShift; x < size.width; x += 60) {
       canvas.drawRect(Rect.fromLTWH(x, floor + 14, 30, 6), stripe);
@@ -265,8 +265,8 @@ class _DashPainter extends CustomPainter {
   }
 
   void _obstacle(Canvas c, _Obstacle o, double floor) {
-    final metal = Paint()..color = const Color(0xFF6D675E);
-    final dark = Paint()..color = const Color(0xFF151413);
+    final metal = Paint()..color = const Color(0xFFA39D92);
+    final dark = Paint()..color = const Color(0xFFECE6DA);
     switch (o.kind) {
       case 0: // dumbbell
         final cy = floor - o.h / 2;
@@ -283,11 +283,11 @@ class _DashPainter extends CustomPainter {
               ..color = dark.color
               ..style = PaintingStyle.stroke
               ..strokeWidth = 6);
-        c.drawCircle(body.translate(-5, -4), 4, Paint()..color = const Color(0x40EEEBE5));
+        c.drawCircle(body.translate(-5, -4), 4, Paint()..color = const Color(0x40141312));
       default: // bench
         final top = floor - o.h;
         c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(o.x, top, o.w, 10), const Radius.circular(4)),
-            Paint()..color = const Color(0xFF151413));
+            Paint()..color = const Color(0xFFECE6DA));
         c.drawRect(Rect.fromLTWH(o.x + 8, top + 10, 6, o.h - 10), metal);
         c.drawRect(Rect.fromLTWH(o.x + o.w - 14, top + 10, 6, o.h - 10), metal);
     }
@@ -299,7 +299,7 @@ class _DashPainter extends CustomPainter {
     final shoulderY = r.top + 18;
     final cx = r.center.dx;
     final line = Paint()
-      ..color = const Color(0xFF151413)
+      ..color = const Color(0xFFECE6DA)
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;
     final shirt = Paint()
@@ -329,10 +329,10 @@ class _DashPainter extends CustomPainter {
     c.drawLine(Offset(cx + 2, shoulderY + 4), Offset(cx + 2 - math.sin(arm) * 18, shoulderY + 4 + math.cos(arm) * 18), line);
     // Head and headband.
     final head = Offset(cx + 3, r.top + 6);
-    c.drawCircle(head, 9, Paint()..color = const Color(0xFF151413));
+    c.drawCircle(head, 9, Paint()..color = const Color(0xFFECE6DA));
     c.drawLine(head.translate(-9, -3), head.translate(9, -3),
         Paint()
-          ..color = const Color(0xFFEEEBE5)
+          ..color = const Color(0xFF141312)
           ..strokeWidth = 2);
   }
 

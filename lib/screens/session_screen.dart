@@ -371,7 +371,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
         color: Sumi.porcelain,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: const BorderSide(color: Color(0xFFD6D0C4)),
+          side: const BorderSide(color: Color(0xFF3A3733)),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
@@ -616,7 +616,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
       decoration: BoxDecoration(
         color: Sumi.porcelain,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD6D0C4)),
+        border: Border.all(color: const Color(0xFF3A3733)),
         boxShadow: const [BoxShadow(color: Color(0x0F000000), blurRadius: 2, offset: Offset(0, 1))],
       ),
       clipBehavior: Clip.antiAlias,
@@ -629,7 +629,7 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
               onTap: enabled ? onTap : null,
               child: Container(
                 decoration: const BoxDecoration(
-                  border: Border(left: BorderSide(color: Color(0xFFE1DCD2)), right: BorderSide(color: Color(0xFFE1DCD2))),
+                  border: Border(left: BorderSide(color: Color(0xFF2C2A27)), right: BorderSide(color: Color(0xFF2C2A27))),
                 ),
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Text(value, style: serif(22, color: enabled ? Sumi.ink : Sumi.faint, height: 1)),
